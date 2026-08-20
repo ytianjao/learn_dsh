@@ -4,6 +4,7 @@
   "description": "Local-first long-term learning companion for DeepSeek Harness Web",
   "type": "module",
   "license": "MIT",
+  "packageManager": "pnpm@11.7.0",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
   "exports": {
@@ -39,10 +40,15 @@
     "test:unit": "vitest run tests/domain.spec.ts",
     "test:integration": "vitest run tests/http.spec.ts",
     "test:compat": "vitest run tests/compatibility.spec.ts",
-    "test:e2e": "playwright test",
-    "check": "npm run typecheck && node --check client/bundle.js && npm test",
+    "test:health": "python -m pytest tests/test_health.py",
+    "test:e2e": "node ./node_modules/@playwright/test/cli.js test",
+    "acceptance:prepare": "bash scripts/cloud-acceptance-prepare.sh",
+    "acceptance:web": "bash scripts/cloud-acceptance-web.sh",
+    "acceptance:test": "node ./node_modules/@playwright/test/cli.js test",
+    "acceptance:reset": "bash scripts/cloud-acceptance-reset.sh",
+    "check": "pnpm run typecheck && node --check client/bundle.js && pnpm test && pnpm run test:health",
     "package:validate": "npm pack --dry-run",
-    "prepare": "npm run build"
+    "prepare": "pnpm run build"
   },
   "engines": {
     "node": "^22.19.0 || >=24"
@@ -57,6 +63,7 @@
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "4.0.1",
+    "@deepseek-ai/dsh": "0.1.0-rc.8",
     "@deepseek-ai/dsh-host-webserver": "0.1.0-rc.8",
     "@deepseek-ai/dsh-storage-domain": "0.0.1-rc.1",
     "@playwright/test": "^1.55.0",

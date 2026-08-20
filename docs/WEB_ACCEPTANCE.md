@@ -1,18 +1,21 @@
-# Web acceptance
+# 网页验收 / Web acceptance
 
-All keyless scenarios run against a real DSH Web profile with deterministic Host state. They never call DeepSeek.
+## 自动验收 / Automated acceptance
 
-1. **Welcome:** open a fresh profile; Chat is selected; the dock shows “你现在想学会什么？” and the goal text box is keyboard reachable. Save a natural-language goal and observe a current task.
-2. **Plan:** open 学习计划; verify active plan version, stages, dependencies, statuses, acceptance criteria, estimate, next action and history come from the state endpoint.
-3. **Refresh:** reload; the project, plan and task remain and no second plan/event appears.
-4. **Evidence:** complete the task, submit the user's explanation, and verify a progress event and “练习中” rationale. Re-submit the same idempotency key through replay and verify one evidence row.
-5. **Insufficient evidence:** submit only completion intent; verify task state may change but mastery does not become mastered and the UI asks for a minimum explanation.
-6. **Progress query:** compare the current stage/next task shown by Progress with the same Host projection consumed by Chat context; they must match without a model call.
-7. **Minor adjustment:** post a deterministic repeated-misconception fixture; verify a new plan version, diff, inline reason and Revert action.
-8. **Major adjustment:** propose weekly hours 10 → 5; verify the active plan is unchanged until Apply. Reject preserves v1; Apply creates v2.
-9. **Review:** verify recent evidence, events, misconceptions and next start survive refresh and are not regenerated prose.
-10. **Conflict and outage:** submit a stale revision and receive an actionable 409; disconnect the Host and see a retry message without losing durable state.
-11. **Settings and data:** edit preferences, export JSON, restart and verify values. Reset requires confirmation and does not touch DSH model credentials.
-12. **Security:** scan client bundle, state export, logs and screenshots for credential fields or key-like fixtures; none may exist.
+1. 启动固定 DSH Web fixture 并设置 `DSH_WEB_URL` / Start the pinned DSH Web fixture and set `DSH_WEB_URL`.
+2. 运行 `npm run test:e2e` / Run `npm run test:e2e`.
+3. 验证首次使用、计划、刷新持久化、进度与复盘 / Verify onboarding, Plan, refresh persistence, Progress, and Review.
 
-Screenshots are generated under ignored `test-results/` and are not committed. They are captured from these running routes: welcome, Plan, Progress/current task, adjustment proposal/diff, assessment/evidence node and connection error. The live-provider smoke is separate: after the user selects a DeepSeek model in DSH Settings, send one teaching message in ordinary Chat and confirm streaming. The test must not read the stored key.
+## 人工关键路径 / Manual critical path
+
+- 在 Settings → LearnLoop 将语言切换到 English，确认 onboarding、导航、任务、三个视图、错误和设置均切换；再切回简体中文 / Switch to English and verify onboarding, navigation, task, all three views, errors, and settings; then switch back.
+- 同时从两个页面提交 mutation，确认一个成功且另一个显示 revision conflict / Submit concurrent mutations from two pages and confirm one succeeds while the other shows a revision conflict.
+- 应用重大结构化调整，确认 active plan 内容和版本变化；撤销后确认内容恢复且产生新版本 / Apply a major structured adjustment, verify content and version changes, then revert and verify restored content in another version.
+- reset 后刷新并确认项目为空且旧页面 mutation 被拒绝 / Reset, refresh to an empty project, and confirm mutations from an old page are rejected.
+- 导出 JSON 并确认浏览器未暴露 DSH 模型凭据 / Export JSON and confirm no DSH model credentials are exposed.
+
+## 可选真实模型 smoke / Optional live-model smoke
+
+用户在 DSH Settings → Models 配置自己的密钥后，发送一条教学消息并确认流式响应。LearnLoop 不读取该密钥，此步骤不属于无密钥自动化。
+
+After the user configures a key in DSH Settings → Models, send one teaching message and verify streaming. LearnLoop never reads the key; this step is outside keyless automation.

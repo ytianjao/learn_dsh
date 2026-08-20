@@ -1,21 +1,23 @@
-# Delivery report
+# 交付报告 / Delivery report
 
-## Delivered
+## 已交付 / Delivered
 
-LearnLoop is a tree-out package for DSH Web. Its Host owns one schema-versioned storage domain and a revision-fenced whole-state endpoint. Its Client contributes Plan, Progress and Review conversation views, onboarding/current-task dock and settings. Ordinary streaming conversation and model configuration remain the official DSH surfaces; LearnLoop does not implement a provider client or credential path.
+LearnLoop 是 DSH Web tree-out 包。Host 提供 schema-versioned Storage Domain 和同源状态 API；Client 提供双语 Plan、Progress、Review、onboarding/current-task dock 与设置。DSH 继续拥有流式对话、模型路由和凭据。
 
-The authoritative state includes a project, immutable Plan versions, tasks, evidence sources, explained discrete mastery, persisted review events, next-action calculation, adjustment proposals/diffs and user decisions. Mutations are idempotent where retries could duplicate facts. Major adjustments do not change the active Plan before approval.
+LearnLoop is a tree-out package for DSH Web. The Host provides a schema-versioned Storage Domain and same-origin state API; the Client provides bilingual Plan, Progress, Review, onboarding/current-task dock, and settings. DSH continues to own streaming conversation, model routing, and credentials.
 
-## Baseline
+写入使用 Storage Domain 原子 update、单调 revision、严格 Zod mutation schema 和幂等键。结构化计划操作可以真正更新或移动任务，应用与撤销均创建不可变版本。
 
-DSH `dsh-v0.1.0-rc.8`, commit `141eb6fef83422698aef7a981029e843e8161534`; Node `^22.19 || >=24`. The primary risk is the carried lazy-CJS Client Module adapter because upstream does not publish the corresponding bundle preset.
+Writes use the Storage Domain's atomic update, monotonic revisions, strict Zod mutation schemas, and idempotency keys. Structured plan operations actually update or move tasks, and both apply and revert create immutable versions.
 
-## Verification
+## 验证 / Verification
 
-The keyless gates cover domain invariants, evidence deduplication/mastery, next action, adjustment approval/versioning, HTTP projection/concurrency, exact DSH peer pins, client syntax, build and package contents. Browser acceptance uses a running fixture profile and generates screenshots from the real DSH page under the ignored `test-results/` directory; generated images are not committed.
+自动门禁覆盖领域不变量、调整应用/撤销、证据与掌握度、依赖、并发冲突、reset revision、非法输入、同源限制、Client syntax、构建和包内容。浏览器验收需要真实 DSH fixture。
 
-The paid live DeepSeek smoke is intentionally user-controlled and is not represented as automated evidence. After the user stores a credential in DSH Web, verify one streamed teaching reply and the scenarios in `docs/WEB_ACCEPTANCE.md`. LearnLoop never reads the credential.
+Automated gates cover domain invariants, adjustment apply/revert, evidence and mastery, dependencies, concurrent conflicts, reset revisions, invalid input, same-origin restrictions, Client syntax, build, and package contents. Browser acceptance requires a real DSH fixture.
 
-## Limitations
+## 限制 / Limitations
 
-The rc.8 tree-out Client Module format is prerelease and must be retested on every DSH upgrade. JSON export is an audit/backup artifact; complete restore uses the DSH Home backup mechanism. The deterministic onboarding plan currently targets the Agent-engineering curriculum inferred from the supplied goal; semantic plan generation and candidate extraction occur in normal DSH conversation and are not a separate paid background call.
+rc.8 Client Module 格式仍是 prerelease。初始课程是明确标注的 Agent 工程模板；没有后台付费生成调用。JSON export 是审计副本，完整恢复使用 DSH Home backup。
+
+The rc.8 Client Module format remains prerelease. The initial curriculum is an explicitly disclosed Agent-engineering template with no paid background generation call. JSON export is an audit copy; complete restore uses DSH Home backup.

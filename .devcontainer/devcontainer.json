@@ -1,0 +1,16 @@
+{
+  "name": "LearnLoop DSH Cloud Acceptance",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:1-22-bookworm",
+  "forwardPorts": [3080],
+  "portsAttributes": {
+    "3080": {
+      "label": "LearnLoop DSH Web",
+      "onAutoForward": "notify",
+      "visibility": "private"
+    }
+  },
+  "postCreateCommand": "corepack enable && corepack prepare pnpm@11.7.0 --activate && pnpm install --frozen-lockfile",
+  "remoteEnv": {
+    "DSH_HOME": "${containerEnv:HOME}/.dsh-learnloop-acceptance"
+  }
+}

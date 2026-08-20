@@ -1,34 +1,28 @@
-# DSH baseline
+# DSH 基线 / DSH baseline
 
-## Pin
+## 固定版本 / Pinned version
 
-LearnLoop pins DeepSeek Harness `dsh-v0.1.0-rc.8`, Git commit `141eb6fef83422698aef7a981029e843e8161534`, retrieved from `https://github.com/deepseek-ai/deepseek-harness`. The published CLI and package family are prereleases. The supported engine is Node `^22.19 || >=24`; DSH uses pnpm workspaces, while this tree-out plugin uses npm for a reproducible standalone install.
+- DSH release / DSH 版本：`0.1.0-rc.8`
+- Baseline commit / 基线提交：`141eb6fef83422698aef7a981029e843e8161534`
+- Node：`22.19.0`（上游范围 / upstream range：`^22.19.0 || >=24.0.0`）
+- pnpm：`11.7.0`
 
-The baseline research covered the root and Client instructions, architecture and development references, the extension/package/conversation-node/settings cookbooks, Client README, and the official Web Bundle, `ui-conversation`, `ui-goal`, `ui-trajectory`, settings, storage-domain and Web server implementations.
+云端通道将 `@deepseek-ai/dsh` 精确固定为 dev dependency。Web profile 通过 `dsh web --dump-default-config` 初始化，当前 checkout 通过 `dsh plugin --profile web add <checkout>` 安装，服务通过 `dsh web --host 127.0.0.1 --port 3080 --trusted-host <authority> --no-open` 启动。
 
-## Public seams used
+The cloud lane pins `@deepseek-ai/dsh` as an exact dev dependency. It initializes the Web profile with `dsh web --dump-default-config`, installs the current checkout with `dsh plugin --profile web add <checkout>`, and starts it with `dsh web --host 127.0.0.1 --port 3080 --trusted-host <authority> --no-open`.
 
-| Seam | LearnLoop use |
-| --- | --- |
-| Loader bundle patch | `cordis.patch.yml` mounts the Host package without a core fork. |
-| `dsh.client` and `./client` | DSH discovers the prebuilt browser Client Module. |
-| `ctx.storageDomain.open` | Versioned local facts under DSH Home; no browser fact store. |
-| `ctx.webServer.register` | One exact, same-origin JSON endpoint for whole-value reads and CAS mutations. |
-| `conversation.view` | Plan, Progress and Review tabs. |
-| `conversation.input.dock` | Onboarding and the current task above the DSH composer. |
-| `settings.section` | LearnLoop preferences, export, backup and explicit data reset. |
-| DSH Chat and model selection | Streaming conversation and the user-selected provider remain entirely Host-owned. |
+LearnLoop 只依赖公开 Host seams：Cordis Context、Storage Domain 与 Host Web Server；Client 通过 DSH Web slots 注册视图、输入 dock 和设置。
 
-The client reads a Host-computed whole value. Writes include the last observed revision and stale writes receive HTTP 409. Durable facts, mastery explanations, next action and plan versions are calculated on the Host.
+LearnLoop depends only on public Host seams: Cordis Context, Storage Domain, and Host Web Server. The Client registers views, an input dock, and settings through DSH Web slots.
 
-## Packaging
+## 所有权 / Ownership
 
-DSH installs the tree-out package with `dsh plugin --profile web add <path-or-package>`. The package's `dsh.bundle.patch` contributes its Host Loader row and `dsh.client.platform=web` exposes `./client`. `profiles/learnloop.patch.yml` is the explicit dedicated-profile patch for installations that compose profiles manually.
+DSH 拥有会话、消息、模型配置、凭据和流式响应。LearnLoop 拥有学习状态和同源投影，不复制凭据或模型路由。
 
-## Compatibility boundary
+DSH owns sessions, messages, model configuration, credentials, and streaming responses. LearnLoop owns learning state and its same-origin projection, without duplicating credentials or model routing.
 
-DSH-specific calls exist only in `src/index.ts`, `src/http.ts`, `cordis.patch.yml`, and the prebuilt `client/bundle.js`. Domain functions have no DSH runtime dependency. `tests/compatibility.spec.ts` locks package versions and every slot name. Run it and browser E2E before changing the pin.
+## 升级规则 / Upgrade rule
 
-The upstream client-bundle preset is not published at this baseline. LearnLoop therefore carries the minimal tested lazy-CJS `window.__ModuleLoader__.load` artifact. This is the largest breakage risk. Slot names, Loader artifact format, Web server registration and storage-domain table behavior are prerelease APIs.
+更改 DSH 基线前，必须重新运行构建、兼容性测试、HTTP/领域测试和真实 Web fixture 验收。Client Module 格式仍为 prerelease 风险边界。
 
-LearnLoop must not modify DSH Agent Loop, Web Shell, central Chat renderer, provider/credential packages, Session log format, or official UI packages. It does not implement a DeepSeek HTTP client and does not accept, store, export or log an API key.
+Before changing the DSH baseline, rerun build, compatibility, HTTP/domain tests, and acceptance against a real Web fixture. The Client Module format remains a prerelease risk boundary.
