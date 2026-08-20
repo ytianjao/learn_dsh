@@ -1,4 +1,4 @@
-# LearnLoop Host and Web Client are discovered from this package row.
+# Discover the LearnLoop Host and Web Client. / 从此包记录发现 LearnLoop Host 与网页客户端。
 - insert:
     - id: learnloop
       name: '@learnloop/dsh-learnloop'

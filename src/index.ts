@@ -1,4 +1,4 @@
-/** LearnLoop Host plugin: durable learning state and same-origin browser API. */
+/** LearnLoop Host plugin: durable state and same-origin API. / LearnLoop Host 插件：持久状态与同源 API。 */
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-host-webserver'
 import type {} from '@deepseek-ai/dsh-storage-domain'

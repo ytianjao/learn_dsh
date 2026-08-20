@@ -39,8 +39,9 @@
     "test:unit": "vitest run tests/domain.spec.ts",
     "test:integration": "vitest run tests/http.spec.ts",
     "test:compat": "vitest run tests/compatibility.spec.ts",
+    "test:health": "python -m pytest tests/test_health.py",
     "test:e2e": "playwright test",
-    "check": "npm run typecheck && node --check client/bundle.js && npm test",
+    "check": "npm run typecheck && node --check client/bundle.js && npm test && npm run test:health",
     "package:validate": "npm pack --dry-run",
     "prepare": "npm run build"
   },

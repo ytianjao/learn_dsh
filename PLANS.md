@@ -1,17 +1,16 @@
-# LearnLoop delivery plan
+# 交付计划 / Delivery plan
 
-The plan is acceptance-driven: every completed row has a browser surface, Host behavior, durable state, automated evidence, and a screenshot target.
+| 切片 / Slice | 状态 / Status | 验证 / Verification |
+| --- | --- | --- |
+| 基线与加载 / Baseline and load | 完成 / Complete | compatibility + installed-profile smoke |
+| 双语网页外壳 / Bilingual web shell | 完成 / Complete | Client syntax + bilingual manual/E2E acceptance |
+| 项目初始化 / Project initialization | 完成 / Complete | domain + HTTP + persistence tests |
+| 对话边界 / Conversation boundary | 完成 / Complete | DSH Chat remains authoritative |
+| 证据与掌握度 / Evidence and mastery | 完成 / Complete | idempotency + mastery tests |
+| 调整与撤销 / Adjustment and revert | 完成 / Complete | executable operation + immutable-version tests |
+| 恢复与安全 / Recovery and safety | 完成 / Complete | atomic CAS, monotonic reset, strict schemas, same-origin tests |
+| 打包 / Packaging | 完成，真实密钥 smoke 由用户执行 / Complete; live-key smoke is user-owned | build + pack validation |
 
-| Slice | Status | Browser outcome | Verification |
-| --- | --- | --- | --- |
-| 0. Baseline and load | Complete | LearnLoop client module loads in the DSH Web profile | compatibility test and installed-profile smoke |
-| 1. Web shell | Complete | Plan, Progress, Review tabs, current-task dock, onboarding and settings | browser E2E and transient screenshots |
-| 2. Project initialization | Complete | A natural-language goal creates a project, v1 plan and current task; refresh restores it | domain, HTTP and browser tests |
-| 3. DSH conversation integration | Complete | Normal DSH Chat remains the primary streaming surface; LearnLoop never handles credentials or calls a provider | profile composition smoke |
-| 4. Evidence and mastery | Complete | Evidence submission updates explained, discrete mastery from the Host | domain and browser tests |
-| 5. Review and next action | Complete | Review uses persisted events and next action uses plan dependencies | domain and browser tests |
-| 6. Adjustments | Complete | Minor changes version immediately; major changes require browser approval; applied changes can be reverted | domain tests and Plan UI |
-| 7. Recovery and safety | Complete for keyless v1 | DSH storage-domain persistence, CAS writes, same-origin mutations, export/reset and actionable connection errors | HTTP and restart acceptance |
-| 8. Package | Complete except user-owned live-key smoke | Installable package, profile patch, user guide and delivery report | build, package validation and keyless gates |
+唯一外部验收是用户在 DSH 中自行配置模型后的真实流式对话。LearnLoop 不读取或接收该凭据。
 
-The sole external acceptance is the opt-in real DeepSeek conversation smoke after the user configures a model in DSH Web. LearnLoop neither reads nor receives that credential.
+The sole external acceptance step is a live streamed conversation after the user configures a model in DSH. LearnLoop never reads or receives that credential.
