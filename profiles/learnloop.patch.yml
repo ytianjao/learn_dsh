@@ -1,0 +1,4 @@
+# Apply after the DSH web profile. The installed package contributes Host and Client halves.
+- insert:
+    - id: learnloop
+      name: '@learnloop/dsh-learnloop'
