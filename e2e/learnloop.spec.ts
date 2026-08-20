@@ -1,0 +1,35 @@
+import { expect, test } from '@playwright/test'
+test('creates a durable learning project and exposes all LearnLoop views', async ({ page }) => {
+  await page.goto('/')
+  await page.waitForTimeout(1000)
+  for (const label of ['Continue', 'Configure later']) {
+    const action = page.getByText(label, { exact: true })
+    if (await action.isVisible().catch(() => false)) await action.click()
+  }
+  if (await page.getByText('你现在想学会什么？').count() === 0) {
+    await page.getByRole('button', { name: 'Choose workspace' }).click()
+    await page.getByRole('button', { name: 'Open' }).click()
+    const configureLater = page.getByText('Configure later', { exact: true })
+    if (await configureLater.isVisible().catch(() => false)) await configureLater.click()
+  }
+  await expect(page.getByText('你现在想学会什么？')).toBeVisible()
+  await page.screenshot({ path: 'test-results/screenshots/welcome.png', fullPage: true })
+  await page.getByRole('region', { name: 'LearnLoop 首次使用' }).getByRole('textbox').fill('我有 5 年开发经验，做过 RAG；每周投入 10 小时，希望独立设计商业级 Agent 系统。')
+  await page.getByRole('button', { name: '开始学习' }).click()
+  await expect(page.getByText(/当前任务：/)).toBeVisible()
+  await page.screenshot({ path: 'test-results/screenshots/current-task.png', fullPage: true })
+  await page.getByText('学习计划', { exact: true }).click()
+  await expect(page.getByRole('heading', { name: '学习计划' })).toBeVisible()
+  await page.screenshot({ path: 'test-results/screenshots/plan.png', fullPage: true })
+  await page.reload()
+  await page.waitForTimeout(500)
+  const laterAfterReload = page.getByText('Configure later', { exact: true })
+  if (await laterAfterReload.isVisible().catch(() => false)) await laterAfterReload.click()
+  await expect(page.getByText(/当前任务：/)).toBeVisible()
+  await page.getByText('学习进度', { exact: true }).click()
+  await expect(page.getByText('未评估').first()).toBeVisible()
+  await page.screenshot({ path: 'test-results/screenshots/progress.png', fullPage: true })
+  await page.getByRole('button', { name: '关闭 LearnLoop 视图' }).click()
+  await page.getByText('复盘', { exact: true }).click()
+  await expect(page.getByText('从真实学习事件重建')).toBeVisible()
+})
