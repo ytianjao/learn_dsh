@@ -1,7 +1,17 @@
 import { describe, expect, it } from 'vitest'
-import { completeTaskWithEvidence, decideAdjustment, emptyState, initializeProject, nextAction, proposeAdjustment, recordEvidence, resetState, setTaskState, updateSettings } from '../src/domain.js'
+import { completeTaskWithEvidence, decideAdjustment, emptyState, initializeProject, nextAction, proposeAdjustment, publishGeneratedPlan, recordEvidence, resetState, setTaskState, updateSettings } from '../src/domain.js'
 
-function project() { return initializeProject(emptyState(), { goal: '掌握商业级 Agent 系统', experience: '5 年开发，做过 RAG', weeklyHours: 10, idempotencyKey: 'init-1' }) }
+export const generatedPlan = { stages: [
+  { key: 'foundation', title: 'Foundation', tasks: [
+    { key: 'runtime-state', title: 'Runtime State', objective: 'Model state', acceptanceCriteria: ['Explain states'], estimateMinutes: 45, conceptKey: 'runtime-state', conceptTitle: 'Runtime State', dependsOn: [] },
+    { key: 'planner-verifier', title: 'Planner Verifier', objective: 'Close loop', acceptanceCriteria: ['Verify retries'], estimateMinutes: 90, conceptKey: 'planner-verifier', conceptTitle: 'Planner Verifier', dependsOn: ['runtime-state'] },
+  ] },
+  { key: 'production', title: 'Production', tasks: [
+    { key: 'tooling-memory', title: 'Tooling Memory', objective: 'Set boundaries', acceptanceCriteria: ['Draw flow'], estimateMinutes: 90, conceptKey: 'tooling-memory', conceptTitle: 'Tooling Memory', dependsOn: ['planner-verifier'] },
+    { key: 'agent-eval', title: 'Agent Eval', objective: 'Evaluate behavior', acceptanceCriteria: ['Write fixtures'], estimateMinutes: 120, conceptKey: 'agent-eval', conceptTitle: 'Agent Eval', dependsOn: ['tooling-memory'] },
+  ] },
+] }
+function project() { return publishGeneratedPlan(initializeProject(emptyState(), { goal: '掌握商业级 Agent 系统', experience: '5 年开发，做过 RAG', weeklyHours: 10, idempotencyKey: 'init-1' }), { ...generatedPlan, idempotencyKey: 'plan-1' }) }
 describe('LearnLoop domain / LearnLoop 领域模型', () => {
   it('publishes one immutable active plan and applies a real operation', () => {
     const state = project(), task = nextAction(state)!
@@ -28,10 +38,10 @@ describe('LearnLoop domain / LearnLoop 领域模型', () => {
   })
   it('deduplicates writes and gives introduced a reachable meaning', () => {
     const initial = project(); expect(initial.mastery[0]?.level).toBe('introduced')
-    const once = recordEvidence(initial, { idempotencyKey: 'ev-1', conceptId: 'runtime-state', kind: 'explanation', summary: 'finish vs status', source: { sessionId: 's1', messageRange: 'm1' }, confidence: .8 })
+    const once = recordEvidence(initial, { idempotencyKey: 'ev-1', conceptId: 'concept-runtime-state', kind: 'explanation', summary: 'finish vs status', source: { sessionId: 's1', messageRange: 'm1' }, confidence: .8 })
     expect(recordEvidence(once, { ...once.evidence[0]!, idempotencyKey: 'ev-1' }).evidence).toHaveLength(1)
   })
-  it('requires diverse evidence before mastery', () => { let state = project(); state = recordEvidence(state, { idempotencyKey: 'a', conceptId: 'runtime-state', kind: 'explanation', summary: '解释', source: { sessionId: 's', messageRange: '1' }, confidence: .8 }); expect(state.mastery[0]?.level).toBe('practicing'); state = recordEvidence(state, { idempotencyKey: 'b', conceptId: 'runtime-state', kind: 'pseudocode', summary: '伪代码', source: { sessionId: 's', messageRange: '2' }, confidence: .9 }); expect(state.mastery[0]?.level).toBe('demonstrated'); state = recordEvidence(state, { idempotencyKey: 'c', conceptId: 'runtime-state', kind: 'assessment', summary: '评测', source: { sessionId: 's', messageRange: '3' }, confidence: .9 }); expect(state.mastery[0]?.level).toBe('mastered') })
+  it('requires diverse evidence before mastery', () => { let state = project(); state = recordEvidence(state, { idempotencyKey: 'a', conceptId: 'concept-runtime-state', kind: 'explanation', summary: '解释', source: { sessionId: 's', messageRange: '1' }, confidence: .8 }); expect(state.mastery[0]?.level).toBe('practicing'); state = recordEvidence(state, { idempotencyKey: 'b', conceptId: 'concept-runtime-state', kind: 'pseudocode', summary: '伪代码', source: { sessionId: 's', messageRange: '2' }, confidence: .9 }); expect(state.mastery[0]?.level).toBe('demonstrated'); state = recordEvidence(state, { idempotencyKey: 'c', conceptId: 'concept-runtime-state', kind: 'assessment', summary: '评测', source: { sessionId: 's', messageRange: '3' }, confidence: .9 }); expect(state.mastery[0]?.level).toBe('mastered') })
   it('computes dependencies and keeps reset revisions monotonic', () => { const state = project(), task = nextAction(state)!; const complete = setTaskState(state, { taskId: task.id, status: 'completed', idempotencyKey: 'done-1' }); expect(nextAction(complete)?.title).toContain('Planner'); const reset = resetState(complete, 'reset-1'); expect(reset.revision).toBe(complete.revision + 1); expect(reset.project).toBeNull() })
   it('records idempotent settings changes', () => { const state = project(), changed = updateSettings(state, { ...state.settings, language: 'en' }, 'settings-1'); expect(changed.settings.language).toBe('en'); expect(updateSettings(changed, changed.settings, 'settings-1')).toBe(changed) })
   it('atomically completes a task with evidence and mastery in one immutable revision', () => {
@@ -54,7 +64,7 @@ describe('LearnLoop domain / LearnLoop 领域模型', () => {
     const state = project(), before = structuredClone(state), task = nextAction(state)!, base = { idempotencyKey: 'invalid', taskId: task.id, conceptId: task.conceptIds[0]!, kind: 'explanation' as const, summary: 'explanation', source: { sessionId: 'browser', messageRange: 'manual-submission' }, confidence: .72 }
     expect(() => completeTaskWithEvidence(state, { ...base, taskId: 'missing-task' })).toThrow('task not found')
     expect(() => completeTaskWithEvidence(state, { ...base, conceptId: 'missing-concept' })).toThrow('concept not found')
-    expect(() => completeTaskWithEvidence(state, { ...base, conceptId: 'planner-verifier' })).toThrow('concept does not belong to task')
+    expect(() => completeTaskWithEvidence(state, { ...base, conceptId: 'concept-planner-verifier' })).toThrow('concept does not belong to task')
     expect(state).toEqual(before)
   })
   it('rejects a second completion command for an already completed task', () => {
@@ -64,4 +74,23 @@ describe('LearnLoop domain / LearnLoop 领域模型', () => {
     expect(once.evidence).toHaveLength(1)
     expect(once.revision).toBe(state.revision + 1)
   })
+})
+
+describe('generated plan publication', () => {
+  it('initializes an empty pending plan and atomically publishes model input', () => {
+    const initialized = initializeProject(emptyState(), { goal: '量化风险', experience: '', weeklyHours: 8, idempotencyKey: 'init-new' })
+    expect(initialized.plans[0]?.stages).toEqual([]); expect(initialized.mastery).toEqual([]); expect(nextAction(initialized)).toBeNull()
+    const published = publishGeneratedPlan(initialized, { ...generatedPlan, idempotencyKey: 'call-1' })
+    expect(published.revision).toBe(initialized.revision + 1); expect(nextAction(published)?.title).toBe('Runtime State'); expect(initialized.plans[0]?.stages).toEqual([])
+    expect(publishGeneratedPlan(published, { ...generatedPlan, idempotencyKey: 'call-1' })).toBe(published)
+    expect(() => publishGeneratedPlan(published, { ...generatedPlan, idempotencyKey: 'call-2' })).toThrow('already published')
+  })
+  it.each([
+    [{ stages: [] }, '1 to 8 stages'],
+    [{ stages: [{ ...generatedPlan.stages[0]!, tasks: [] }] }, 'stage must contain'],
+    [{ stages: [{ ...generatedPlan.stages[0]!, tasks: [generatedPlan.stages[0]!.tasks[0]!, { ...generatedPlan.stages[0]!.tasks[1]!, key: 'runtime-state' }] }] }, 'duplicate task key'],
+    [{ stages: [{ ...generatedPlan.stages[0]!, tasks: [generatedPlan.stages[0]!.tasks[0]!, { ...generatedPlan.stages[0]!.tasks[1]!, dependsOn: ['missing'] }] }] }, 'does not exist'],
+    [{ stages: [{ ...generatedPlan.stages[0]!, tasks: [generatedPlan.stages[0]!.tasks[0]!, { ...generatedPlan.stages[0]!.tasks[1]!, dependsOn: ['planner-verifier'] }] }] }, 'itself'],
+  ])('rejects invalid plans without partial writes', (candidate, message) => { const state = initializeProject(emptyState(), { goal: 'x', experience: '', weeklyHours: 1, idempotencyKey: 'i' }); const before = structuredClone(state); expect(() => publishGeneratedPlan(state, { ...candidate, idempotencyKey: 'bad' })).toThrow(message); expect(state).toEqual(before) })
+  it('destructively discards business state while retaining settings', async () => { const { discardCurrentProject } = await import('../src/domain.js'); const state = project(); const discarded = discardCurrentProject(state, 'discard-1'); expect(discarded.project).toBeNull(); expect(discarded.plans).toEqual([]); expect(discarded.settings).toEqual(state.settings); expect(discardCurrentProject(discarded, 'discard-1')).toBe(discarded) })
 })

@@ -23,3 +23,12 @@ Complete `docs/CLOUD_ACCEPTANCE.md` first. Record the PR commit, DSH baseline, b
 CI 自动覆盖 build、typecheck、lint、领域/HTTP、package validation、无密钥 DSH boot、页面垂直切片、刷新恢复及 artifact 留存。真实 DeepSeek 对话、计费账户行为和生产网络错误只能由用户选择执行，不能作为 PR 必需门禁。
 
 CI covers build, typecheck, lint, domain/HTTP tests, package validation, keyless DSH boot, browser slices, refresh persistence, and artifacts. Live DeepSeek conversation, billed-account behavior, and production network failures are user-opt-in and cannot be required PR gates.
+
+
+## DSH Chat generated plans (PR #13)
+
+LearnLoop now creates an empty active plan and sends a structured planning request through the public DSH Chat `InputActions`. The selected DSH model must publish the complete authoritative plan with `learnloop_publish_plan`; LearnLoop never reads API keys, calls a provider, or parses assistant prose. The Host validates keys, sizes, uniqueness, dependency references and DAG shape, then assigns IDs/status/version and commits plan, mastery, events, and one revision atomically.
+
+User flow: (1) configure and select a model in **DSH Settings → Models**; (2) enter a LearnLoop goal; (3) choose **Start learning**; (4) observe the planning request in Chat; (5) the model calls `learnloop_publish_plan`; (6) the model introduces the returned first task; (7) choose **Start task in chat** for teaching; (8) submit your own evidence in LearnLoop; (9) export before using **Discard current plan** to start over. Normal `dsh web` uses the selected user model; only browser E2E uses the deterministic mock provider.
+
+DSH owns session, Chat, model routing, streaming, credentials, and the tool execution runtime. LearnLoop owns the learning project, validated structured plan, evidence, mastery, review, and plan-publication rules. Discard is destructive, not history archival: it removes current business data while preserving settings. Export first when an audit copy is required.

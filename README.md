@@ -42,9 +42,9 @@ Open the URL printed by DSH. The Web profile discovers both the Host plugin and 
 4. 在当前任务面板提交自己的解释或证据；仅点击完成不会证明掌握 / Submit your own explanation or evidence; clicking complete alone does not prove mastery.
 5. 在 **Settings → LearnLoop → 界面语言 / Interface language** 中即时切换简体中文或 English / Switch the complete LearnLoop UI between Simplified Chinese and English.
 
-当前 keyless v1 从确定性的 Agent 工程模板开始。用户输入仍会持久化，但不会被表示为已经完成语义课程生成。
+计划由当前 DSH 对话所选模型通过受约束 Tool 生成；LearnLoop 不读取模型凭据，也不把自然语言输出当作正式计划。
 
-The current keyless v1 begins with a deterministic Agent-engineering template. The learner input is persisted, but the product does not represent it as semantically generated curriculum.
+The model selected in the current DSH chat publishes the plan through a constrained tool; LearnLoop neither reads credentials nor treats prose as an authoritative plan.
 
 ## 一致性与计划调整 / Consistency and plan adjustments
 
@@ -88,3 +88,12 @@ pnpm run package:validate
 Browser E2E requires a running DSH Web fixture at `DSH_WEB_URL`, defaulting to `http://127.0.0.1:3080`. Routine checks never call a model provider.
 
 架构和验收资料 / Architecture and acceptance references: `docs/DSH_BASELINE.md`, `docs/PRODUCT_CONTRACT.md`, `docs/WEB_ACCEPTANCE.md`, and `docs/UPSTREAM_COMPATIBILITY.md`.
+
+
+## DSH Chat generated plans (PR #13)
+
+LearnLoop now creates an empty active plan and sends a structured planning request through the public DSH Chat `InputActions`. The selected DSH model must publish the complete authoritative plan with `learnloop_publish_plan`; LearnLoop never reads API keys, calls a provider, or parses assistant prose. The Host validates keys, sizes, uniqueness, dependency references and DAG shape, then assigns IDs/status/version and commits plan, mastery, events, and one revision atomically.
+
+User flow: (1) configure and select a model in **DSH Settings → Models**; (2) enter a LearnLoop goal; (3) choose **Start learning**; (4) observe the planning request in Chat; (5) the model calls `learnloop_publish_plan`; (6) the model introduces the returned first task; (7) choose **Start task in chat** for teaching; (8) submit your own evidence in LearnLoop; (9) export before using **Discard current plan** to start over. Normal `dsh web` uses the selected user model; only browser E2E uses the deterministic mock provider.
+
+DSH owns session, Chat, model routing, streaming, credentials, and the tool execution runtime. LearnLoop owns the learning project, validated structured plan, evidence, mastery, review, and plan-publication rules. Discard is destructive, not history archival: it removes current business data while preserving settings. Export first when an audit copy is required.

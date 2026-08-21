@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { z } from 'zod'
 import type { DomainSpec } from '@deepseek-ai/dsh-storage-domain'
-import type { AdjustmentProposal, Evidence, LearnLoopState, MasteryLevel, PlanOperation, PlanVersion, StateTable, TaskState } from './types.js'
+import type { AdjustmentProposal, Evidence, GeneratedPlanInput, LearnLoopState, MasteryLevel, PlanOperation, PlanVersion, StateTable, TaskState } from './types.js'
 
 const now = (): string => new Date().toISOString()
 const id = (prefix: string): string => `${prefix}_${randomUUID()}`
@@ -35,18 +35,42 @@ function nextRevision(state: LearnLoopState): LearnLoopState { return { ...state
 export function initializeProject(state: LearnLoopState, input: { goal: string; experience: string; weeklyHours: number; idempotencyKey: string }): LearnLoopState {
   if (state.events.some(item => item.stableId === input.idempotencyKey)) return state
   if (state.project !== null) throw new Error('an active project already exists')
-  const createdAt = now(); const conceptIds = ['runtime-state', 'planner-verifier', 'tooling-memory', 'agent-eval']
-  const plan: PlanVersion = { id: id('plan'), version: 1, status: 'active', createdAt, stages: [
-    { id: 'stage-runtime', title: 'Agent Runtime 基础 / Agent Runtime Basics', tasks: [
-      { id: 'task-runtime-state', title: '手写最小 Agent Runtime 的状态模型 / Model a minimal Agent Runtime', objective: '区分全局完成、可恢复和等待状态 / Separate completion, resumable, and waiting states', acceptanceCriteria: ['解释 finish、status 与 checkpoint 的职责 / Explain finish, status, and checkpoint', '提交状态转换伪代码 / Submit state-transition pseudocode'], estimateMinutes: 45, status: 'active', conceptIds: ['runtime-state'], dependsOn: [] },
-      { id: 'task-planner-verifier', title: '实现 Planner / Verifier 闭环 / Build the Planner-Verifier loop', objective: '用影响等级约束规划和验证 / Bound planning and verification by impact', acceptanceCriteria: ['列出三类失败影响 / List three failure impacts', '用 fixture 验证重试边界 / Verify retry boundaries with fixtures'], estimateMinutes: 90, status: 'pending', conceptIds: ['planner-verifier'], dependsOn: ['runtime-state'] },
-    ]},
-    { id: 'stage-production', title: '生产级 Agent 系统 / Production Agent Systems', tasks: [
-      { id: 'task-tooling-memory', title: '设计 Tooling 与 Memory 边界 / Design Tooling and Memory boundaries', objective: '区分模型上下文与持久事实 / Separate model context from durable facts', acceptanceCriteria: ['提交数据流图 / Submit a data-flow diagram'], estimateMinutes: 90, status: 'pending', conceptIds: ['tooling-memory'], dependsOn: ['planner-verifier'] },
-      { id: 'task-agent-eval', title: '建立 Agent Eval / Establish Agent Evals', objective: '用可回放证据验收系统行为 / Validate behavior with replayable evidence', acceptanceCriteria: ['提交至少三个确定性场景 / Submit at least three deterministic scenarios'], estimateMinutes: 120, status: 'pending', conceptIds: ['agent-eval'], dependsOn: ['tooling-memory'] },
-    ]},
-  ] }
-  return nextRevision({ ...state, project: { id: id('project'), title: input.goal.slice(0, 40), goal: input.goal, experience: input.experience, weeklyHours: input.weeklyHours, status: 'active', createdAt }, plans: [plan], mastery: conceptIds.map((conceptId, index) => ({ conceptId, title: ['Agent 状态建模 / Agent State Modeling', 'Planner / Verifier', 'Tooling 与 Memory / Tooling and Memory', 'Agent Eval'][index]!, level: 'introduced', evidenceIds: [], rationale: '已列入计划，尚无用户证据。 / Planned, but no learner evidence yet.', updatedAt: createdAt })), events: [...state.events, event('learnloop/project-created', '学习项目已建立 / Learning project created', input.idempotencyKey), event('learnloop/plan-created', '第一版学习计划已生成 / Initial learning plan generated')] })
+  const createdAt = now()
+  const plan: PlanVersion = { id: id('plan'), version: 1, status: 'active', createdAt, stages: [] }
+  return nextRevision({ ...state, project: { id: id('project'), title: input.goal.trim().slice(0, 40), goal: input.goal.trim(), experience: input.experience.trim(), weeklyHours: input.weeklyHours, status: 'active', createdAt }, plans: [plan], mastery: [], events: [...state.events, event('learnloop/project-created', '学习项目已建立 / Learning project created', input.idempotencyKey), event('learnloop/plan-generation-requested', '已请求 DSH 模型生成计划 / Plan generation requested')] })
+}
+
+const keyPattern = /^[a-z0-9][a-z0-9-]{0,63}$/
+function clean(value: string, label: string, max: number): string { const result = value.trim(); if (!result || result.length > max) throw new Error(`${label} must be non-empty and at most ${max} characters`); return result }
+export function publishGeneratedPlan(state: LearnLoopState, input: GeneratedPlanInput & { idempotencyKey: string }): LearnLoopState {
+  if (state.events.some(item => item.stableId === input.idempotencyKey)) return state
+  if (!state.project) throw new Error('project does not exist')
+  const plan = activePlan(state); if (plan.stages.length !== 0) throw new Error('project plan is already published')
+  if (input.stages.length < 1 || input.stages.length > 8) throw new Error('project plan must contain 1 to 8 stages')
+  const stageKeys = new Set<string>(); const taskKeys = new Set<string>(); const conceptKeys = new Set<string>()
+  const normalized = input.stages.map(stage => {
+    const stageKey = clean(stage.key, 'stage key', 64); if (!keyPattern.test(stageKey)) throw new Error('stage key is invalid'); if (stageKeys.has(stageKey)) throw new Error('duplicate stage key'); stageKeys.add(stageKey)
+    if (stage.tasks.length < 1) throw new Error('project plan stage must contain a task')
+    return { key: stageKey, title: clean(stage.title, 'stage title', 200), tasks: stage.tasks.map(task => {
+      const taskKey = clean(task.key, 'task key', 64); if (!keyPattern.test(taskKey)) throw new Error('task key is invalid'); if (taskKeys.has(taskKey)) throw new Error('duplicate task key'); taskKeys.add(taskKey)
+      const conceptKey = clean(task.conceptKey, 'concept key', 64); if (!keyPattern.test(conceptKey)) throw new Error('concept key is invalid'); if (conceptKeys.has(conceptKey)) throw new Error('duplicate concept key'); conceptKeys.add(conceptKey)
+      if (task.acceptanceCriteria.length < 1 || task.acceptanceCriteria.length > 8) throw new Error('task must contain 1 to 8 acceptance criteria')
+      if (!Number.isInteger(task.estimateMinutes) || task.estimateMinutes < 10 || task.estimateMinutes > 480) throw new Error('task estimateMinutes must be between 10 and 480')
+      return { key: taskKey, title: clean(task.title, 'task title', 300), objective: clean(task.objective, 'task objective', 2000), acceptanceCriteria: task.acceptanceCriteria.map(value => clean(value, 'acceptance criterion', 500)), estimateMinutes: task.estimateMinutes, conceptKey, conceptTitle: clean(task.conceptTitle, 'concept title', 300), dependsOn: task.dependsOn.map(value => { const dependency = clean(value, 'dependency key', 64); if (!keyPattern.test(dependency)) throw new Error('dependency key is invalid'); return dependency }) }
+    }) }
+  })
+  const tasks = normalized.flatMap(stage => stage.tasks); if (tasks.length < 2 || tasks.length > 20) throw new Error('project plan must contain 2 to 20 tasks')
+  for (const task of tasks) { const unique = new Set(task.dependsOn); if (unique.size !== task.dependsOn.length) throw new Error('duplicate task dependency'); if (unique.has(task.key)) throw new Error('task cannot depend on itself'); if ([...unique].some(dep => !taskKeys.has(dep))) throw new Error('task dependency does not exist') }
+  const visiting = new Set<string>(); const visited = new Set<string>(); const byKey = new Map(tasks.map(task => [task.key, task])); const visit = (key: string): void => { if (visiting.has(key)) throw new Error('task dependency graph contains a cycle'); if (visited.has(key)) return; visiting.add(key); for (const dependency of byKey.get(key)!.dependsOn) visit(dependency); visiting.delete(key); visited.add(key) }; for (const task of tasks) visit(task.key)
+  const first = tasks.find(task => task.dependsOn.length === 0); if (!first) throw new Error('project plan has no executable task')
+  const createdAt = now(); const stages = normalized.map(stage => ({ id: `stage-${stage.key}`, title: stage.title, tasks: stage.tasks.map(task => ({ id: `task-${task.key}`, title: task.title, objective: task.objective, acceptanceCriteria: task.acceptanceCriteria, estimateMinutes: task.estimateMinutes, status: task.key === first.key ? 'active' as const : 'pending' as const, conceptIds: [`concept-${task.conceptKey}`], dependsOn: task.dependsOn.map(dependency => `concept-${byKey.get(dependency)!.conceptKey}`) })) }))
+  const changedPlan = { ...plan, stages }; return nextRevision({ ...state, plans: state.plans.map(item => item.id === plan.id ? changedPlan : item), mastery: tasks.map(task => ({ conceptId: `concept-${task.conceptKey}`, title: task.conceptTitle, level: 'introduced' as const, evidenceIds: [], rationale: '概念由模型生成的学习计划引入，但尚无用户证据。 / Introduced by the model-generated plan; no learner evidence yet.', updatedAt: createdAt })), events: [...state.events, event('learnloop/plan-generated', '模型生成的学习计划已发布 / Model-generated plan published', input.idempotencyKey), event('learnloop/task-activated', `已激活任务：${first.title} / First task activated`)] })
+}
+
+export function discardCurrentProject(state: LearnLoopState, idempotencyKey: string): LearnLoopState {
+  if (state.events.some(item => item.stableId === idempotencyKey)) return state
+  if (!state.project) throw new Error('project does not exist')
+  return nextRevision({ ...state, project: null, plans: [], evidence: [], mastery: [], assessments: [], adjustments: [], misconceptions: [], reviewQueue: [], events: [event('learnloop/project-discarded', '当前学习计划已破坏性废弃 / Current learning project destructively discarded', idempotencyKey)] })
 }
 
 export function setTaskState(state: LearnLoopState, input: { taskId: string; status: TaskState; idempotencyKey: string }): LearnLoopState {
