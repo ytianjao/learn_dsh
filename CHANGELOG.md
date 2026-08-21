@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 任务完成与证据提交现在通过单个原子 mutation 完成，避免部分成功和重复 revision / Task completion and evidence submission now use one atomic mutation, preventing partial success and duplicate revision increments.
 - 增加固定 DSH/Node/pnpm 的 GitHub Actions 与私有 Codespaces 云端验收通道 / Added GitHub Actions and a private Codespaces acceptance lane pinned to DSH, Node, and pnpm.
 - 增加隔离且可重复的 profile 准备、loopback Web 启动、验收清理脚本和完整人工场景 / Added repeatable isolated-profile preparation, loopback Web startup, reset scripts, and manual scenarios.
 - 使用 Storage Domain 原子 update 修复并发丢失更新，并保持 reset revision 单调 / Fixed concurrent lost updates with atomic Storage Domain updates and monotonic reset revisions.

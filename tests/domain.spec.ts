@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { decideAdjustment, emptyState, initializeProject, nextAction, proposeAdjustment, recordEvidence, resetState, setTaskState, updateSettings } from '../src/domain.js'
+import { completeTaskWithEvidence, decideAdjustment, emptyState, initializeProject, nextAction, proposeAdjustment, recordEvidence, resetState, setTaskState, updateSettings } from '../src/domain.js'
 
 function project() { return initializeProject(emptyState(), { goal: '掌握商业级 Agent 系统', experience: '5 年开发，做过 RAG', weeklyHours: 10, idempotencyKey: 'init-1' }) }
 describe('LearnLoop domain / LearnLoop 领域模型', () => {
@@ -34,4 +34,34 @@ describe('LearnLoop domain / LearnLoop 领域模型', () => {
   it('requires diverse evidence before mastery', () => { let state = project(); state = recordEvidence(state, { idempotencyKey: 'a', conceptId: 'runtime-state', kind: 'explanation', summary: '解释', source: { sessionId: 's', messageRange: '1' }, confidence: .8 }); expect(state.mastery[0]?.level).toBe('practicing'); state = recordEvidence(state, { idempotencyKey: 'b', conceptId: 'runtime-state', kind: 'pseudocode', summary: '伪代码', source: { sessionId: 's', messageRange: '2' }, confidence: .9 }); expect(state.mastery[0]?.level).toBe('demonstrated'); state = recordEvidence(state, { idempotencyKey: 'c', conceptId: 'runtime-state', kind: 'assessment', summary: '评测', source: { sessionId: 's', messageRange: '3' }, confidence: .9 }); expect(state.mastery[0]?.level).toBe('mastered') })
   it('computes dependencies and keeps reset revisions monotonic', () => { const state = project(), task = nextAction(state)!; const complete = setTaskState(state, { taskId: task.id, status: 'completed', idempotencyKey: 'done-1' }); expect(nextAction(complete)?.title).toContain('Planner'); const reset = resetState(complete, 'reset-1'); expect(reset.revision).toBe(complete.revision + 1); expect(reset.project).toBeNull() })
   it('records idempotent settings changes', () => { const state = project(), changed = updateSettings(state, { ...state.settings, language: 'en' }, 'settings-1'); expect(changed.settings.language).toBe('en'); expect(updateSettings(changed, changed.settings, 'settings-1')).toBe(changed) })
+  it('atomically completes a task with evidence and mastery in one immutable revision', () => {
+    const state = project(), before = structuredClone(state), task = nextAction(state)!
+    const completed = completeTaskWithEvidence(state, { idempotencyKey: 'complete-1', taskId: task.id, conceptId: task.conceptIds[0]!, kind: 'explanation', summary: 'finish 和 checkpoint 支持恢复', source: { sessionId: 'browser', messageRange: 'manual-submission' }, confidence: .72 })
+    expect(completed.revision).toBe(state.revision + 1)
+    expect(completed.evidence).toHaveLength(state.evidence.length + 1)
+    expect(completed.plans[0]!.stages[0]!.tasks[0]!.status).toBe('completed')
+    expect(completed.mastery[0]).toMatchObject({ level: 'practicing', evidenceIds: [completed.evidence[0]!.id] })
+    expect(completed.events.some(item => item.stableId === 'complete-1')).toBe(true)
+    expect(state).toEqual(before)
+  })
+  it('replays an atomic completion without duplicate changes', () => {
+    const state = project(), task = nextAction(state)!, input = { idempotencyKey: 'complete-replay', taskId: task.id, conceptId: task.conceptIds[0]!, kind: 'explanation' as const, summary: 'explanation', source: { sessionId: 'browser', messageRange: 'manual-submission' }, confidence: .72 }
+    const once = completeTaskWithEvidence(state, input), replayed = completeTaskWithEvidence(once, input)
+    expect(replayed).toBe(once)
+    expect(replayed).toMatchObject({ revision: once.revision, evidence: once.evidence, events: once.events })
+  })
+  it('rejects invalid task and concepts without changing the input state', () => {
+    const state = project(), before = structuredClone(state), task = nextAction(state)!, base = { idempotencyKey: 'invalid', taskId: task.id, conceptId: task.conceptIds[0]!, kind: 'explanation' as const, summary: 'explanation', source: { sessionId: 'browser', messageRange: 'manual-submission' }, confidence: .72 }
+    expect(() => completeTaskWithEvidence(state, { ...base, taskId: 'missing-task' })).toThrow('task not found')
+    expect(() => completeTaskWithEvidence(state, { ...base, conceptId: 'missing-concept' })).toThrow('concept not found')
+    expect(() => completeTaskWithEvidence(state, { ...base, conceptId: 'planner-verifier' })).toThrow('concept does not belong to task')
+    expect(state).toEqual(before)
+  })
+  it('rejects a second completion command for an already completed task', () => {
+    const state = project(), task = nextAction(state)!, input = { taskId: task.id, conceptId: task.conceptIds[0]!, kind: 'explanation' as const, summary: 'explanation', source: { sessionId: 'browser', messageRange: 'manual-submission' }, confidence: .72 }
+    const once = completeTaskWithEvidence(state, { ...input, idempotencyKey: 'complete-first' })
+    expect(() => completeTaskWithEvidence(once, { ...input, idempotencyKey: 'complete-second' })).toThrow('task is already completed')
+    expect(once.evidence).toHaveLength(1)
+    expect(once.revision).toBe(state.revision + 1)
+  })
 })

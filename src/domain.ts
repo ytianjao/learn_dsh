@@ -72,6 +72,37 @@ export function recordEvidence(state: LearnLoopState, input: Omit<Evidence, 'id'
   return nextRevision({ ...state, evidence, mastery, events: [...state.events, event('learnloop/evidence-recorded', `已记录证据：${saved.summary} / Evidence recorded`, input.idempotencyKey), event('learnloop/mastery-changed', mastery.find(item => item.conceptId === saved.conceptId)!.rationale)] })
 }
 
+export function completeTaskWithEvidence(state: LearnLoopState, input: { idempotencyKey: string; taskId: string; conceptId: string; kind: Evidence['kind']; summary: string; source: Evidence['source']; confidence: number }): LearnLoopState {
+  if (state.events.some(item => item.stableId === input.idempotencyKey)) return state
+  const plan = activePlan(state)
+  const task = plan.stages.flatMap(stage => stage.tasks).find(item => item.id === input.taskId)
+  if (!task) throw new Error('task not found')
+  if (!state.mastery.some(item => item.conceptId === input.conceptId)) throw new Error('concept not found')
+  if (!task.conceptIds.includes(input.conceptId)) throw new Error('concept does not belong to task')
+  if (task.status === 'completed') throw new Error('task is already completed')
+
+  const createdAt = now()
+  const saved: Evidence = { id: id('evidence'), idempotencyKey: input.idempotencyKey, conceptId: input.conceptId, kind: input.kind, summary: input.summary, source: input.source, confidence: input.confidence, createdAt }
+  const evidence = [...state.evidence, saved]
+  const mastery = state.mastery.map(item => {
+    if (item.conceptId !== saved.conceptId) return item
+    const related = evidence.filter(candidate => candidate.conceptId === item.conceptId)
+    return { ...item, ...masteryFor(related), evidenceIds: related.map(candidate => candidate.id), updatedAt: createdAt }
+  })
+  const changedPlan = { ...plan, stages: plan.stages.map(stage => ({ ...stage, tasks: stage.tasks.map(item => item.id === task.id ? { ...item, status: 'completed' as const } : item) })) }
+  return nextRevision({
+    ...state,
+    plans: state.plans.map(item => item.id === plan.id ? changedPlan : item),
+    evidence,
+    mastery,
+    events: [
+      ...state.events,
+      event('learnloop/task-completed-with-evidence', `任务已完成并记录证据：${saved.summary} / Task completed with evidence`, input.idempotencyKey),
+      event('learnloop/mastery-changed', mastery.find(item => item.conceptId === saved.conceptId)!.rationale),
+    ],
+  })
+}
+
 function applyOperations(plan: PlanVersion, operations: PlanOperation[]): { stages: PlanVersion['stages']; inverse: PlanOperation[] } {
   let stages = structuredClone(plan.stages); const inverse: PlanOperation[] = []
   for (const operation of operations) {
