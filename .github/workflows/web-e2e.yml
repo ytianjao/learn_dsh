@@ -55,7 +55,17 @@ jobs:
             --success-text 'Mock LearnLoop teaching response.' \
             >mock-provider.log 2>&1 &
           echo $! >mock-provider.pid
-          timeout 30 bash -c "until grep -q '\"type\":\"ready\"' mock-provider.log; do sleep 1; done"
+          mock_provider_pid="$(cat mock-provider.pid)"
+          if ! timeout 60 bash -c '
+            until curl --silent --output /dev/null http://127.0.0.1:8000/; do
+              kill -0 "$1" 2>/dev/null || exit 1
+              sleep 1
+            done
+          ' _ "$mock_provider_pid"; then
+            echo "Mock provider did not become ready; provider output follows:" >&2
+            cat mock-provider.log >&2
+            exit 1
+          fi
       - name: Prepare isolated DSH profile
         run: pnpm run acceptance:prepare
       - name: Start DSH Web on loopback
