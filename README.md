@@ -25,8 +25,6 @@ Install, build, keyless tests, plan/progress, replay, and package validation do 
 corepack enable
 pnpm install --frozen-lockfile
 pnpm run build
-npm install --legacy-peer-deps
-npm run build
 dsh plugin --profile web add .
 dsh --profile web --dump-config
 dsh web
@@ -60,15 +58,6 @@ Plan adjustments contain machine-applicable structured operations plus a reviewa
 
 ## 备份、升级与卸载 / Backup, upgrade, and uninstall
 
-
-Every write checks a monotonic revision inside the Storage Domain's atomic `update`. Retryable mutations carry idempotency keys. Reset clears learning data without rolling the revision backward.
-
-计划调整包含可执行的结构化操作和便于审阅的 diff。小调整可自动生成新计划版本；大调整必须批准。撤销操作会应用已保存的逆操作并生成另一个不可变计划版本。
-
-Plan adjustments contain machine-applicable structured operations plus a reviewable diff. Minor changes may create a new plan version automatically; major changes require approval. Revert applies stored inverse operations and creates another immutable version.
-
-## 备份、升级与卸载 / Backup, upgrade, and uninstall
-
 在 LearnLoop 设置中选择“导出 / 备份”。JSON 是便携审计副本；完整恢复仍使用 DSH Home 备份流程。卸载前可先导出，然后执行：
 
 Choose “Export / Backup” in LearnLoop settings. JSON is a portable audit copy; complete restore still uses the DSH Home backup procedure. Export first if needed, then uninstall with:
@@ -92,13 +81,6 @@ pnpm run lint
 pnpm test
 pnpm run test:e2e
 pnpm run package:validate
-npm install --legacy-peer-deps
-npm run build
-npm run typecheck
-npm run lint
-npm test
-npm run test:e2e
-npm run package:validate
 ```
 
 浏览器 E2E 需要已运行的 DSH Web fixture，地址由 `DSH_WEB_URL` 指定，默认是 `http://127.0.0.1:3080`。常规检查不会调用模型提供商。

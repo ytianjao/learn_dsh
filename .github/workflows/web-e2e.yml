@@ -47,7 +47,7 @@ jobs:
           printf '127.0.0.1 api.deepseek.com\n127.0.0.1 api.deepseek.com.cn\n' | sudo tee -a /etc/hosts
       - name: Start deterministic mock provider
         run: |
-          pnpm --dir dsh-source run mock:llm -- \
+          pnpm --dir dsh-source run mock:llm \
             --host 127.0.0.1 \
             --port 8000 \
             --sequence success \
