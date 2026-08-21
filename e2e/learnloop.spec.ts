@@ -37,7 +37,7 @@ async function openLearnLoopOnboarding(page: Page) {
   await expect(welcome).toBeVisible()
 }
 
-test('creates a durable learning project and exposes all LearnLoop views', async ({ page }) => {
+test('creates a durable learning project while its model-generated plan is pending', async ({ page }) => {
   await page.goto('/')
   await openLearnLoopOnboarding(page)
   if (await page.getByText('What would you like to learn?').isVisible().catch(() => false)) {
@@ -51,34 +51,12 @@ test('creates a durable learning project and exposes all LearnLoop views', async
   await page.screenshot({ path: 'test-results/screenshots/welcome.png', fullPage: true })
   await page.getByRole('region', { name: /LearnLoop 首次使用/ }).getByRole('textbox').fill('我有 5 年开发经验，做过 RAG；每周投入 10 小时，希望独立设计商业级 Agent 系统。')
   await page.getByRole('button', { name: '开始学习' }).click()
-  await expect(page.getByText(/当前任务：/)).toBeVisible()
-  await page.screenshot({ path: 'test-results/screenshots/current-task.png', fullPage: true })
-  const completionMutations: Array<{ action?: string; status?: string }> = []
-  page.on('request', request => {
-    if (request.method() === 'POST' && request.url().includes('/learnloop/api/v1/state')) completionMutations.push(request.postDataJSON() as { action?: string; status?: string })
-  })
-  await page.getByRole('button', { name: '展开' }).click()
-  page.once('dialog', dialog => dialog.accept('finish、status 和 checkpoint 分别负责终止、状态与恢复。'))
-  await page.getByRole('button', { name: '完成并提交证据' }).click()
-  await expect(page.getByText(/当前任务：.*Planner \/ Verifier/)).toBeVisible()
-  expect(completionMutations.filter(item => item.action === 'complete-task-with-evidence')).toHaveLength(1)
-  expect(completionMutations.some(item => item.action === 'evidence' || item.action === 'task-state' && item.status === 'completed')).toBe(false)
-  await page.getByText('学习进度', { exact: true }).click()
-  await expect(page.getByText('finish、status 和 checkpoint 分别负责终止、状态与恢复。')).toBeVisible()
-  await page.getByRole('button', { name: '关闭 LearnLoop 视图' }).click()
-  await page.getByText('学习计划', { exact: true }).click()
-  await expect(page.getByRole('heading', { name: '学习计划' })).toBeVisible()
-  await page.screenshot({ path: 'test-results/screenshots/plan.png', fullPage: true })
+  await expect(page.getByText('正在等待 DSH 模型生成学习计划')).toBeVisible()
+  await page.screenshot({ path: 'test-results/screenshots/pending-plan.png', fullPage: true })
   await page.reload()
   await page.waitForTimeout(500)
   const laterAfterReload = page.getByText('Configure later', { exact: true })
   if (await laterAfterReload.isVisible().catch(() => false)) await laterAfterReload.click()
-  await expect(page.getByText(/当前任务：.*Planner \/ Verifier/)).toBeVisible()
-  await page.getByText('学习进度', { exact: true }).click()
-  await expect(page.getByText('finish、status 和 checkpoint 分别负责终止、状态与恢复。')).toBeVisible()
-  await expect(page.getByText('练习中').first()).toBeVisible()
-  await page.screenshot({ path: 'test-results/screenshots/progress.png', fullPage: true })
-  await page.getByRole('button', { name: '关闭 LearnLoop 视图' }).click()
-  await page.getByText('复盘', { exact: true }).click()
-  await expect(page.getByText('从真实学习事件重建')).toBeVisible()
+  await expect(page.getByText('正在等待 DSH 模型生成学习计划')).toBeVisible()
+  await expect(page.getByRole('button', { name: '重新请求生成计划' })).toBeVisible()
 })
