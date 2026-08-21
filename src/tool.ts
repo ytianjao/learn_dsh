@@ -7,11 +7,11 @@ const key = { ...text, description: 'Stable lowercase key matching [a-z0-9][a-z0
 export function createLearnLoopPublishPlanTool(table: StateTable) {
   return defineTool({
     name: 'learnloop_publish_plan',
-    description: 'Use only in response to an explicit LearnLoop create-plan request. Submit the complete plan, never an incremental patch; it becomes LearnLoop authoritative state. You MUST call this tool rather than merely printing a plan. dependsOn entries reference task keys. Do not provide database IDs, status, plan version, revision, or timestamps. After success, begin teaching the returned firstTask and give one clear next action.',
+    description: 'Publish the complete authoritative LearnLoop plan. The plan MUST obey the project learningPreferences and must never change the learner-selected mode or practice capacity. dependsOn references task keys. Never provide status, database IDs, plan version, revision, or timestamps.',
     parameters: {
       stages: { type: 'array', required: true, items: { type: 'object', additionalProperties: false, properties: {
         key, title: text, tasks: { type: 'array', required: true, items: { type: 'object', additionalProperties: false, properties: {
-          key, title: text, objective: text, acceptanceCriteria: { type: 'array', required: true, items: { type: 'string' } }, estimateMinutes: { type: 'integer', required: true }, conceptKey: key, conceptTitle: text, dependsOn: { type: 'array', required: true, items: { type: 'string' } },
+          key, title: text, objective: text, acceptanceCriteria: { type: 'array', required: true, items: { type: 'string' } }, estimateMinutes: { type: 'integer', required: true }, conceptKey: key, conceptTitle: text, dependsOn: { type: 'array', required: true, items: { type: 'string' } }, kind: { type: 'string', required: true, enum: ['lesson', 'worked-example', 'discussion', 'exercise', 'implementation'] }, completion: { type: 'object', required: true, additionalProperties: false, properties: { kind: { type: 'string', required: true, enum: ['short-answer', 'reflection', 'artifact'] }, prompt: text } },
         } } },
       } } },
     },
@@ -24,7 +24,10 @@ export function createLearnLoopPublishPlanTool(table: StateTable) {
     async execute(args, exec) {
       if (!exec.agent) throw new Error('learnloop_publish_plan requires an agent execution')
       if (exec.signal.aborted) throw exec.signal.reason
-      const updated = await table.update('singleton', state => publishGeneratedPlan(state, { stages: args.stages, idempotencyKey: `learnloop-plan:${exec.callId}` }))
+      const updated = await table.update('singleton', state => {
+        if (!state.project || state.project.sessionId !== exec.agent!.id) throw new Error('learnloop_publish_plan session does not own this project')
+        return publishGeneratedPlan(state, { stages: args.stages, idempotencyKey: `learnloop-plan:${exec.callId}` })
+      })
       if (exec.signal.aborted) throw exec.signal.reason
       const plan = updated.plans.find(item => item.status === 'active')!
       const firstTask = nextAction(updated)!

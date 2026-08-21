@@ -1,178 +1,57 @@
 import { randomUUID } from 'node:crypto'
 import { z } from 'zod'
 import type { DomainSpec } from '@deepseek-ai/dsh-storage-domain'
-import type { AdjustmentProposal, Evidence, GeneratedPlanInput, LearnLoopState, MasteryLevel, PlanOperation, PlanVersion, StateTable, TaskState } from './types.js'
-
-const now = (): string => new Date().toISOString()
-const id = (prefix: string): string => `${prefix}_${randomUUID()}`
-const taskState = z.enum(['pending', 'active', 'blocked', 'completed', 'skipped'])
-const taskSchema = z.object({ id: z.string(), title: z.string(), objective: z.string(), acceptanceCriteria: z.array(z.string()), estimateMinutes: z.number().int().positive(), status: taskState, conceptIds: z.array(z.string()), dependsOn: z.array(z.string()) })
-const operationSchema = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('update-task'), taskId: z.string(), patch: z.object({ title: z.string().optional(), objective: z.string().optional(), acceptanceCriteria: z.array(z.string()).optional(), estimateMinutes: z.number().int().positive().optional(), status: taskState.optional() }).strict() }),
-  z.object({ type: z.literal('move-task'), taskId: z.string(), toStageId: z.string(), beforeTaskId: z.string().optional() }),
-])
-const stateSchema: z.ZodType<LearnLoopState> = z.object({
-  schemaVersion: z.literal(1), revision: z.number().int().nonnegative(),
-  project: z.object({ id: z.string(), title: z.string(), goal: z.string(), experience: z.string(), weeklyHours: z.number().int().min(1).max(80), status: z.enum(['active', 'archived']), createdAt: z.string() }).nullable(),
-  plans: z.array(z.object({ id: z.string(), version: z.number().int().positive(), status: z.enum(['draft', 'active', 'superseded', 'archived']), createdAt: z.string(), stages: z.array(z.object({ id: z.string(), title: z.string(), tasks: z.array(taskSchema) })) })),
-  evidence: z.array(z.object({ id: z.string(), idempotencyKey: z.string(), conceptId: z.string(), kind: z.enum(['explanation', 'pseudocode', 'implementation', 'hypothesis', 'assessment', 'reflection']), summary: z.string(), source: z.object({ sessionId: z.string(), messageRange: z.string() }), confidence: z.number().min(0).max(1), createdAt: z.string() })),
-  mastery: z.array(z.object({ conceptId: z.string(), title: z.string(), level: z.enum(['unassessed', 'introduced', 'practicing', 'demonstrated', 'mastered']), evidenceIds: z.array(z.string()), rationale: z.string(), updatedAt: z.string() })),
-  assessments: z.array(z.object({ id: z.string(), conceptId: z.string(), result: z.enum(['needs-work', 'passed', 'excellent']), explanation: z.string(), evidenceId: z.string(), createdAt: z.string() })),
-  adjustments: z.array(z.object({ id: z.string(), idempotencyKey: z.string(), impact: z.enum(['minor', 'major']), state: z.enum(['proposed', 'applied', 'rejected', 'reverted']), reason: z.string(), diff: z.array(z.string()), operations: z.array(operationSchema), inverseOperations: z.array(operationSchema).optional(), createdAt: z.string(), appliedPlanVersion: z.number().optional(), revertedPlanVersion: z.number().optional() })),
-  events: z.array(z.object({ id: z.string(), stableId: z.string(), type: z.string(), summary: z.string(), createdAt: z.string() })),
-  settings: z.object({ language: z.enum(['zh-CN', 'en']), weeklyHours: z.number().int().min(1).max(80), strictness: z.enum(['supportive', 'balanced', 'strict']), autoMinorAdjustments: z.boolean(), showModeExplanation: z.boolean(), antiDependency: z.boolean() }),
-  misconceptions: z.array(z.string()), reviewQueue: z.array(z.string()),
-}).strict()
-export const learnLoopDomainSpec = { name: 'learnloop', version: 1, tables: { state: { valueSchema: stateSchema } } } as const satisfies DomainSpec
-
-export function emptyState(revision = 0): LearnLoopState {
-  return { schemaVersion: 1, revision, project: null, plans: [], evidence: [], mastery: [], assessments: [], adjustments: [], events: [], misconceptions: [], reviewQueue: [], settings: { language: 'zh-CN', weeklyHours: 10, strictness: 'balanced', autoMinorAdjustments: true, showModeExplanation: false, antiDependency: true } }
-}
-function event(type: string, summary: string, stableId = id('evt')) { return { id: id('event'), stableId, type, summary, createdAt: now() } }
-function activePlan(state: LearnLoopState): PlanVersion { const plans = state.plans.filter(plan => plan.status === 'active'); if (plans.length !== 1) throw new Error('project must have exactly one active plan'); return plans[0]! }
-function nextRevision(state: LearnLoopState): LearnLoopState { return { ...state, revision: state.revision + 1 } }
-
-export function initializeProject(state: LearnLoopState, input: { goal: string; experience: string; weeklyHours: number; idempotencyKey: string }): LearnLoopState {
-  if (state.events.some(item => item.stableId === input.idempotencyKey)) return state
-  if (state.project !== null) throw new Error('an active project already exists')
-  const createdAt = now()
-  const plan: PlanVersion = { id: id('plan'), version: 1, status: 'active', createdAt, stages: [] }
-  return nextRevision({ ...state, project: { id: id('project'), title: input.goal.trim().slice(0, 40), goal: input.goal.trim(), experience: input.experience.trim(), weeklyHours: input.weeklyHours, status: 'active', createdAt }, plans: [plan], mastery: [], events: [...state.events, event('learnloop/project-created', '学习项目已建立 / Learning project created', input.idempotencyKey), event('learnloop/plan-generation-requested', '已请求 DSH 模型生成计划 / Plan generation requested')] })
-}
-
-const keyPattern = /^[a-z0-9][a-z0-9-]{0,63}$/
-function clean(value: string, label: string, max: number): string { const result = value.trim(); if (!result || result.length > max) throw new Error(`${label} must be non-empty and at most ${max} characters`); return result }
-export function publishGeneratedPlan(state: LearnLoopState, input: GeneratedPlanInput & { idempotencyKey: string }): LearnLoopState {
-  if (state.events.some(item => item.stableId === input.idempotencyKey)) return state
-  if (!state.project) throw new Error('project does not exist')
-  const plan = activePlan(state); if (plan.stages.length !== 0) throw new Error('project plan is already published')
-  if (input.stages.length < 1 || input.stages.length > 8) throw new Error('project plan must contain 1 to 8 stages')
-  const stageKeys = new Set<string>(); const taskKeys = new Set<string>(); const conceptKeys = new Set<string>()
-  const normalized = input.stages.map(stage => {
-    const stageKey = clean(stage.key, 'stage key', 64); if (!keyPattern.test(stageKey)) throw new Error('stage key is invalid'); if (stageKeys.has(stageKey)) throw new Error('duplicate stage key'); stageKeys.add(stageKey)
-    if (stage.tasks.length < 1) throw new Error('project plan stage must contain a task')
-    return { key: stageKey, title: clean(stage.title, 'stage title', 200), tasks: stage.tasks.map(task => {
-      const taskKey = clean(task.key, 'task key', 64); if (!keyPattern.test(taskKey)) throw new Error('task key is invalid'); if (taskKeys.has(taskKey)) throw new Error('duplicate task key'); taskKeys.add(taskKey)
-      const conceptKey = clean(task.conceptKey, 'concept key', 64); if (!keyPattern.test(conceptKey)) throw new Error('concept key is invalid'); if (conceptKeys.has(conceptKey)) throw new Error('duplicate concept key'); conceptKeys.add(conceptKey)
-      if (task.acceptanceCriteria.length < 1 || task.acceptanceCriteria.length > 8) throw new Error('task must contain 1 to 8 acceptance criteria')
-      if (!Number.isInteger(task.estimateMinutes) || task.estimateMinutes < 10 || task.estimateMinutes > 480) throw new Error('task estimateMinutes must be between 10 and 480')
-      return { key: taskKey, title: clean(task.title, 'task title', 300), objective: clean(task.objective, 'task objective', 2000), acceptanceCriteria: task.acceptanceCriteria.map(value => clean(value, 'acceptance criterion', 500)), estimateMinutes: task.estimateMinutes, conceptKey, conceptTitle: clean(task.conceptTitle, 'concept title', 300), dependsOn: task.dependsOn.map(value => { const dependency = clean(value, 'dependency key', 64); if (!keyPattern.test(dependency)) throw new Error('dependency key is invalid'); return dependency }) }
-    }) }
-  })
-  const tasks = normalized.flatMap(stage => stage.tasks); if (tasks.length < 2 || tasks.length > 20) throw new Error('project plan must contain 2 to 20 tasks')
-  for (const task of tasks) { const unique = new Set(task.dependsOn); if (unique.size !== task.dependsOn.length) throw new Error('duplicate task dependency'); if (unique.has(task.key)) throw new Error('task cannot depend on itself'); if ([...unique].some(dep => !taskKeys.has(dep))) throw new Error('task dependency does not exist') }
-  const visiting = new Set<string>(); const visited = new Set<string>(); const byKey = new Map(tasks.map(task => [task.key, task])); const visit = (key: string): void => { if (visiting.has(key)) throw new Error('task dependency graph contains a cycle'); if (visited.has(key)) return; visiting.add(key); for (const dependency of byKey.get(key)!.dependsOn) visit(dependency); visiting.delete(key); visited.add(key) }; for (const task of tasks) visit(task.key)
-  const first = tasks.find(task => task.dependsOn.length === 0); if (!first) throw new Error('project plan has no executable task')
-  const createdAt = now(); const stages = normalized.map(stage => ({ id: `stage-${stage.key}`, title: stage.title, tasks: stage.tasks.map(task => ({ id: `task-${task.key}`, title: task.title, objective: task.objective, acceptanceCriteria: task.acceptanceCriteria, estimateMinutes: task.estimateMinutes, status: task.key === first.key ? 'active' as const : 'pending' as const, conceptIds: [`concept-${task.conceptKey}`], dependsOn: task.dependsOn.map(dependency => `concept-${byKey.get(dependency)!.conceptKey}`) })) }))
-  const changedPlan = { ...plan, stages }; return nextRevision({ ...state, plans: state.plans.map(item => item.id === plan.id ? changedPlan : item), mastery: tasks.map(task => ({ conceptId: `concept-${task.conceptKey}`, title: task.conceptTitle, level: 'introduced' as const, evidenceIds: [], rationale: '概念由模型生成的学习计划引入，但尚无用户证据。 / Introduced by the model-generated plan; no learner evidence yet.', updatedAt: createdAt })), events: [...state.events, event('learnloop/plan-generated', '模型生成的学习计划已发布 / Model-generated plan published', input.idempotencyKey), event('learnloop/task-activated', `已激活任务：${first.title} / First task activated`)] })
-}
-
-export function discardCurrentProject(state: LearnLoopState, idempotencyKey: string): LearnLoopState {
-  if (state.events.some(item => item.stableId === idempotencyKey)) return state
-  if (!state.project) throw new Error('project does not exist')
-  return nextRevision({ ...state, project: null, plans: [], evidence: [], mastery: [], assessments: [], adjustments: [], misconceptions: [], reviewQueue: [], events: [event('learnloop/project-discarded', '当前学习计划已破坏性废弃 / Current learning project destructively discarded', idempotencyKey)] })
-}
-
-export function setTaskState(state: LearnLoopState, input: { taskId: string; status: TaskState; idempotencyKey: string }): LearnLoopState {
-  if (state.events.some(item => item.stableId === input.idempotencyKey)) return state
-  const plan = activePlan(state); let found = false
-  const changed = { ...plan, stages: plan.stages.map(stage => ({ ...stage, tasks: stage.tasks.map(task => { if (task.id !== input.taskId) return task; found = true; return { ...task, status: input.status } }) })) }
-  if (!found) throw new Error('task not found')
-  return nextRevision({ ...state, plans: state.plans.map(item => item.id === plan.id ? changed : item), events: [...state.events, event('learnloop/task-changed', `任务状态已更新为 ${input.status} / Task status changed to ${input.status}`, input.idempotencyKey)] })
-}
-
-function masteryFor(evidence: Evidence[]): { level: MasteryLevel; rationale: string } {
-  const high = evidence.filter(item => item.confidence >= .75); const kinds = new Set(high.map(item => item.kind))
-  if (high.length >= 3 && (kinds.has('assessment') || kinds.has('implementation'))) return { level: 'mastered', rationale: `已有 ${high.length} 条高置信证据并包含评测或实现。 / ${high.length} high-confidence items include an assessment or implementation.` }
-  if (high.length >= 2) return { level: 'demonstrated', rationale: `已有 ${high.length} 条相互支持的高置信证据。 / ${high.length} high-confidence items corroborate one another.` }
-  if (evidence.length > 0) return { level: 'practicing', rationale: `已记录 ${evidence.length} 条练习证据。 / ${evidence.length} practice evidence item(s) recorded.` }
-  return { level: 'introduced', rationale: '已列入计划，尚无用户证据。 / Planned, but no learner evidence yet.' }
-}
-export function recordEvidence(state: LearnLoopState, input: Omit<Evidence, 'id' | 'createdAt'>): LearnLoopState {
-  if (state.evidence.some(item => item.idempotencyKey === input.idempotencyKey)) return state
-  if (!state.mastery.some(item => item.conceptId === input.conceptId)) throw new Error('concept not found')
-  const saved: Evidence = { ...input, id: id('evidence'), createdAt: now() }; const evidence = [...state.evidence, saved]
-  const mastery = state.mastery.map(item => { if (item.conceptId !== saved.conceptId) return item; const related = evidence.filter(candidate => candidate.conceptId === item.conceptId); return { ...item, ...masteryFor(related), evidenceIds: related.map(candidate => candidate.id), updatedAt: now() } })
-  return nextRevision({ ...state, evidence, mastery, events: [...state.events, event('learnloop/evidence-recorded', `已记录证据：${saved.summary} / Evidence recorded`, input.idempotencyKey), event('learnloop/mastery-changed', mastery.find(item => item.conceptId === saved.conceptId)!.rationale)] })
-}
-
-export function completeTaskWithEvidence(state: LearnLoopState, input: { idempotencyKey: string; taskId: string; conceptId: string; kind: Evidence['kind']; summary: string; source: Evidence['source']; confidence: number }): LearnLoopState {
-  if (state.events.some(item => item.stableId === input.idempotencyKey)) return state
-  const plan = activePlan(state)
-  const task = plan.stages.flatMap(stage => stage.tasks).find(item => item.id === input.taskId)
-  if (!task) throw new Error('task not found')
-  if (!state.mastery.some(item => item.conceptId === input.conceptId)) throw new Error('concept not found')
-  if (!task.conceptIds.includes(input.conceptId)) throw new Error('concept does not belong to task')
-  if (task.status === 'completed') throw new Error('task is already completed')
-
-  const createdAt = now()
-  const saved: Evidence = { id: id('evidence'), idempotencyKey: input.idempotencyKey, conceptId: input.conceptId, kind: input.kind, summary: input.summary, source: input.source, confidence: input.confidence, createdAt }
-  const evidence = [...state.evidence, saved]
-  const mastery = state.mastery.map(item => {
-    if (item.conceptId !== saved.conceptId) return item
-    const related = evidence.filter(candidate => candidate.conceptId === item.conceptId)
-    return { ...item, ...masteryFor(related), evidenceIds: related.map(candidate => candidate.id), updatedAt: createdAt }
-  })
-  const changedPlan = { ...plan, stages: plan.stages.map(stage => ({ ...stage, tasks: stage.tasks.map(item => item.id === task.id ? { ...item, status: 'completed' as const } : item) })) }
-  return nextRevision({
-    ...state,
-    plans: state.plans.map(item => item.id === plan.id ? changedPlan : item),
-    evidence,
-    mastery,
-    events: [
-      ...state.events,
-      event('learnloop/task-completed-with-evidence', `任务已完成并记录证据：${saved.summary} / Task completed with evidence`, input.idempotencyKey),
-      event('learnloop/mastery-changed', mastery.find(item => item.conceptId === saved.conceptId)!.rationale),
-    ],
-  })
-}
-
-function applyOperations(plan: PlanVersion, operations: PlanOperation[]): { stages: PlanVersion['stages']; inverse: PlanOperation[] } {
-  let stages = structuredClone(plan.stages); const inverse: PlanOperation[] = []
-  for (const operation of operations) {
-    const sourceStage = stages.find(stage => stage.tasks.some(task => task.id === operation.taskId)); const task = sourceStage?.tasks.find(item => item.id === operation.taskId)
-    if (!sourceStage || !task) throw new Error('adjustment task not found')
-    if (operation.type === 'update-task') {
-      const oldPatch = Object.fromEntries(Object.keys(operation.patch).map(key => [key, structuredClone(task[key as keyof typeof task])])) as Extract<PlanOperation, { type: 'update-task' }>['patch']
-      inverse.unshift({ type: 'update-task', taskId: task.id, patch: oldPatch })
-      Object.assign(task, structuredClone(operation.patch))
-    } else {
-      if (operation.beforeTaskId === operation.taskId) throw new Error('adjustment cannot move a task before itself')
-      const oldIndex = sourceStage.tasks.findIndex(item => item.id === task.id); const oldBefore = sourceStage.tasks[oldIndex + 1]?.id
-      const targetStage = stages.find(stage => stage.id === operation.toStageId); if (!targetStage) throw new Error('adjustment target stage not found')
-      if (operation.beforeTaskId && !targetStage.tasks.some(item => item.id === operation.beforeTaskId)) throw new Error('adjustment anchor task not found')
-      sourceStage.tasks.splice(oldIndex, 1); const targetIndex = operation.beforeTaskId ? targetStage.tasks.findIndex(item => item.id === operation.beforeTaskId) : targetStage.tasks.length
-      targetStage.tasks.splice(targetIndex, 0, task); inverse.unshift({ type: 'move-task', taskId: task.id, toStageId: sourceStage.id, ...(oldBefore ? { beforeTaskId: oldBefore } : {}) })
-    }
+import type { AdjustmentProposal, Evidence, GeneratedPlanInput, LearnLoopState, LearningPreferences, MasteryLevel, PlanOperation, PlanVersion, StateTable, TaskState } from './types.js'
+const now=()=>new Date().toISOString(), id=(p:string)=>`${p}_${randomUUID()}`
+export const DEFAULT_PREFERENCES: LearningPreferences={mode:'balanced',practiceCapacity:'light',explanationDepth:'standard',exampleDensity:'standard',additionalNotes:''}
+const preferenceSchema=z.object({mode:z.enum(['knowledge-first','balanced','practice-first']),practiceCapacity:z.enum(['none','light','full']),explanationDepth:z.enum(['standard','deep']),exampleDensity:z.enum(['standard','high']),additionalNotes:z.string().max(2000)}).strict()
+const taskState=z.enum(['pending','active','blocked','completed','skipped']), kind=z.enum(['lesson','worked-example','discussion','exercise','implementation']), completion=z.object({kind:z.enum(['short-answer','reflection','artifact']),prompt:z.string()})
+const taskSchema=z.object({id:z.string(),title:z.string(),objective:z.string(),acceptanceCriteria:z.array(z.string()),estimateMinutes:z.number().int().positive(),status:taskState,conceptIds:z.array(z.string()),dependsOn:z.array(z.string()),kind,completion})
+const operationSchema=z.discriminatedUnion('type',[z.object({type:z.literal('update-task'),taskId:z.string(),patch:z.object({title:z.string().optional(),objective:z.string().optional(),acceptanceCriteria:z.array(z.string()).optional(),estimateMinutes:z.number().int().positive().optional(),status:taskState.optional()}).strict()}),z.object({type:z.literal('move-task'),taskId:z.string(),toStageId:z.string(),beforeTaskId:z.string().optional()})])
+const stateV2Schema:z.ZodType<LearnLoopState>=z.object({schemaVersion:z.literal(2),revision:z.number().int().nonnegative(),project:z.object({id:z.string(),title:z.string(),goal:z.string(),experience:z.string(),weeklyHours:z.number().int().min(1).max(80),status:z.enum(['active','archived']),createdAt:z.string(),sessionId:z.string().nullable(),learningPreferences:preferenceSchema}).nullable(),plans:z.array(z.object({id:z.string(),version:z.number().int().positive(),status:z.enum(['draft','active','superseded','archived']),createdAt:z.string(),stages:z.array(z.object({id:z.string(),title:z.string(),tasks:z.array(taskSchema)}))})),evidence:z.array(z.object({id:z.string(),idempotencyKey:z.string(),conceptId:z.string(),kind:z.enum(['explanation','pseudocode','implementation','hypothesis','assessment','reflection']),summary:z.string(),source:z.object({sessionId:z.string(),messageRange:z.string()}),confidence:z.number().min(0).max(1),createdAt:z.string()})),mastery:z.array(z.object({conceptId:z.string(),title:z.string(),level:z.enum(['unassessed','introduced','practicing','demonstrated','mastered']),evidenceIds:z.array(z.string()),rationale:z.string(),updatedAt:z.string()})),assessments:z.array(z.object({id:z.string(),conceptId:z.string(),result:z.enum(['needs-work','passed','excellent']),explanation:z.string(),evidenceId:z.string(),createdAt:z.string()})),adjustments:z.array(z.object({id:z.string(),idempotencyKey:z.string(),impact:z.enum(['minor','major']),state:z.enum(['proposed','applied','rejected','reverted']),reason:z.string(),diff:z.array(z.string()),operations:z.array(operationSchema),inverseOperations:z.array(operationSchema).optional(),createdAt:z.string(),appliedPlanVersion:z.number().optional(),revertedPlanVersion:z.number().optional()})),events:z.array(z.object({id:z.string(),stableId:z.string(),type:z.string(),summary:z.string(),createdAt:z.string()})),settings:z.object({language:z.enum(['zh-CN','en']),weeklyHours:z.number().int().min(1).max(80),strictness:z.enum(['supportive','balanced','strict']),autoMinorAdjustments:z.boolean(),showModeExplanation:z.boolean(),antiDependency:z.boolean()}),misconceptions:z.array(z.string()),reviewQueue:z.array(z.string())}).strict()
+type LegacyState=Omit<LearnLoopState,'schemaVersion'|'project'|'plans'>&{schemaVersion:1;project:(Omit<NonNullable<LearnLoopState['project']>,'sessionId'|'learningPreferences'>)|null;plans:Array<Omit<PlanVersion,'stages'>&{stages:Array<{id:string;title:string;tasks:Array<Omit<PlanVersion['stages'][number]['tasks'][number],'kind'|'completion'>>}>}>}
+export function migrateStateV1ToV2(value: LegacyState): LearnLoopState {
+  return {
+    ...value,
+    schemaVersion: 2,
+    project: value.project ? { ...value.project, sessionId: null, learningPreferences: { ...DEFAULT_PREFERENCES } } : null,
+    plans: value.plans.map(plan => ({
+      ...plan,
+      stages: plan.stages.map(stage => ({
+        ...stage,
+        tasks: stage.tasks.map(task => ({
+          ...task,
+          kind: 'lesson' as const,
+          completion: { kind: 'short-answer' as const, prompt: `请简要说明：${task.acceptanceCriteria.join('；')}` },
+        })),
+      })),
+    })),
   }
-  return { stages, inverse }
 }
-function versionPlan(state: LearnLoopState, operations: PlanOperation[]): { state: LearnLoopState; version: number; inverse: PlanOperation[] } {
-  const current = activePlan(state); const applied = applyOperations(current, operations); const version = Math.max(...state.plans.map(plan => plan.version)) + 1
-  const replacement: PlanVersion = { ...structuredClone(current), id: id('plan'), version, createdAt: now(), status: 'active', stages: applied.stages }
-  return { state: { ...state, plans: [...state.plans.map(plan => plan.id === current.id ? { ...plan, status: 'superseded' as const } : plan), replacement] }, version, inverse: applied.inverse }
-}
-export function proposeAdjustment(state: LearnLoopState, input: { impact: 'minor' | 'major'; reason: string; diff: string[]; operations: PlanOperation[]; idempotencyKey: string }): LearnLoopState {
-  if (state.adjustments.some(item => item.idempotencyKey === input.idempotencyKey)) return state
-  if (input.operations.length === 0) throw new Error('adjustment requires at least one operation')
-  const autoApply = input.impact === 'minor' && state.settings.autoMinorAdjustments
-  let proposal: AdjustmentProposal = { id: id('adjustment'), ...input, state: autoApply ? 'applied' : 'proposed', createdAt: now() }
-  let result = { ...state, adjustments: [...state.adjustments, proposal] }
-  if (autoApply) { const applied = versionPlan(result, input.operations); proposal = { ...proposal, appliedPlanVersion: applied.version, inverseOperations: applied.inverse }; result = { ...applied.state, adjustments: applied.state.adjustments.map(item => item.id === proposal.id ? proposal : item) } }
-  return nextRevision({ ...result, events: [...result.events, event(autoApply ? 'learnloop/adjustment-applied' : 'learnloop/adjustment-proposed', input.reason, input.idempotencyKey)] })
-}
-export function decideAdjustment(state: LearnLoopState, adjustmentId: string, decision: 'apply' | 'reject' | 'revert', idempotencyKey: string): LearnLoopState {
-  if (state.events.some(item => item.stableId === idempotencyKey)) return state
-  const target = state.adjustments.find(item => item.id === adjustmentId); if (!target) throw new Error('adjustment not found')
-  if (decision === 'apply' && target.state !== 'proposed' || decision === 'reject' && target.state !== 'proposed' || decision === 'revert' && target.state !== 'applied') throw new Error('adjustment decision is invalid for its current state')
-  let result = state; let replacement: Partial<AdjustmentProposal>
-  if (decision === 'apply') { const applied = versionPlan(state, target.operations); result = applied.state; replacement = { state: 'applied', appliedPlanVersion: applied.version, inverseOperations: applied.inverse } }
-  else if (decision === 'revert') { const reverted = versionPlan(state, target.inverseOperations ?? []); result = reverted.state; replacement = { state: 'reverted', revertedPlanVersion: reverted.version } }
-  else replacement = { state: 'rejected' }
-  result = { ...result, adjustments: result.adjustments.map(item => item.id === adjustmentId ? { ...item, ...replacement } : item), events: [...result.events, event(`learnloop/adjustment-${decision}`, `计划调整决定：${decision} / Adjustment decision: ${decision}`, idempotencyKey)] }
-  return nextRevision(result)
-}
-export function updateSettings(state: LearnLoopState, settings: LearnLoopState['settings'], idempotencyKey: string): LearnLoopState { if (state.events.some(item => item.stableId === idempotencyKey)) return state; return nextRevision({ ...state, settings, events: [...state.events, event('learnloop/settings-changed', '设置已更新 / Settings updated', idempotencyKey)] }) }
-export function resetState(state: LearnLoopState, idempotencyKey: string): LearnLoopState { const reset = emptyState(state.revision + 1); reset.events = [event('learnloop/reset', '学习数据已重置 / Learning data reset', idempotencyKey)]; return reset }
-export function nextAction(state: LearnLoopState) { if (!state.project) return null; const tasks = activePlan(state).stages.flatMap(stage => stage.tasks); return tasks.find(task => task.status === 'active') ?? tasks.find(task => task.status === 'pending' && task.dependsOn.every(dep => tasks.some(candidate => candidate.conceptIds.includes(dep) && candidate.status === 'completed'))) ?? null }
-export async function ensureState(table: StateTable): Promise<LearnLoopState> { const current = table.get('singleton'); if (current) return current; const fresh = emptyState(); await table.put('singleton', fresh); return fresh }
+const persistedSchema=z.preprocess(value=>{if(value&&typeof value==='object'&&'schemaVersion'in value&&(value as {schemaVersion:unknown}).schemaVersion===1)return migrateStateV1ToV2(value as LegacyState);return value},stateV2Schema)
+export const learnLoopDomainSpec={name:'learnloop',version:2,tables:{state:{valueSchema:persistedSchema}}} as const satisfies DomainSpec
+export function emptyState(revision=0):LearnLoopState{return {schemaVersion:2,revision,project:null,plans:[],evidence:[],mastery:[],assessments:[],adjustments:[],events:[],misconceptions:[],reviewQueue:[],settings:{language:'zh-CN',weeklyHours:10,strictness:'balanced',autoMinorAdjustments:true,showModeExplanation:false,antiDependency:true}}}
+function event(type:string,summary:string,stableId=id('evt')){return{id:id('event'),stableId,type,summary,createdAt:now()}}
+function activePlan(s:LearnLoopState){const p=s.plans.filter(x=>x.status==='active');if(p.length!==1)throw Error('project must have exactly one active plan');return p[0]!}
+const bump=(s:LearnLoopState):LearnLoopState=>({...s,revision:s.revision+1})
+export function initializeProject(s:LearnLoopState,input:{goal:string;experience:string;weeklyHours:number;sessionId:string;learningPreferences:LearningPreferences;idempotencyKey:string}){if(s.events.some(x=>x.stableId===input.idempotencyKey))return s;if(s.project)throw Error('project already exists');const createdAt=now(),goal=input.goal.trim(),sessionId=input.sessionId.trim();if(!goal||!sessionId)throw Error('project goal and sessionId are required');const plan:PlanVersion={id:id('plan'),version:1,status:'active',createdAt,stages:[]};return bump({...s,project:{id:id('project'),title:goal.slice(0,40),goal,experience:input.experience.trim(),weeklyHours:input.weeklyHours,status:'active',createdAt,sessionId,learningPreferences:preferenceSchema.parse(input.learningPreferences)},plans:[plan],events:[...s.events,event('learnloop/project-created','Learning project created',input.idempotencyKey),event('learnloop/plan-generation-requested','Plan generation requested')]})}
+export function bindProjectSession(s:LearnLoopState,input:{sessionId:string;idempotencyKey:string}){if(s.events.some(x=>x.stableId===input.idempotencyKey))return s;if(!s.project)throw Error('project does not exist');if(s.project.sessionId!==null)throw Error('project is already bound');const sessionId=input.sessionId.trim();if(!sessionId)throw Error('project sessionId is required');return bump({...s,project:{...s.project,sessionId},events:[...s.events,event('learnloop/session-bound','Project bound to DSH session',input.idempotencyKey)]})}
+const clean=(v:string,l:string,max:number)=>{const x=v.trim();if(!x||x.length>max)throw Error(`${l} must be non-empty and at most ${max} characters`);return x}, keyPattern=/^[a-z0-9][a-z0-9-]{0,63}$/
+export function publishGeneratedPlan(s:LearnLoopState,input:GeneratedPlanInput&{idempotencyKey:string}){if(s.events.some(x=>x.stableId===input.idempotencyKey))return s;if(!s.project)throw Error('project does not exist');const plan=activePlan(s);if(plan.stages.length)throw Error('project plan is already published');if(input.stages.length<1||input.stages.length>8)throw Error('project plan must contain 1 to 8 stages');const sk=new Set<string>(),tk=new Set<string>(),ck=new Set<string>();const normalized=input.stages.map(stage=>{const stageKey=clean(stage.key,'stage key',64);if(!keyPattern.test(stageKey)||sk.has(stageKey))throw Error('stage key is invalid or duplicate');sk.add(stageKey);if(!stage.tasks.length)throw Error('project plan stage must contain a task');return{key:stageKey,title:clean(stage.title,'stage title',200),tasks:stage.tasks.map(task=>{const taskKey=clean(task.key,'task key',64),conceptKey=clean(task.conceptKey,'concept key',64);if(!keyPattern.test(taskKey)||tk.has(taskKey))throw Error('duplicate task key');if(!keyPattern.test(conceptKey)||ck.has(conceptKey))throw Error('duplicate concept key');tk.add(taskKey);ck.add(conceptKey);if(task.acceptanceCriteria.length<1||task.acceptanceCriteria.length>8)throw Error('task must contain 1 to 8 acceptance criteria');if(!Number.isInteger(task.estimateMinutes)||task.estimateMinutes<10||task.estimateMinutes>480)throw Error('task estimateMinutes must be between 10 and 480');return{...task,key:taskKey,conceptKey,title:clean(task.title,'task title',300),objective:clean(task.objective,'task objective',2000),conceptTitle:clean(task.conceptTitle,'concept title',300),acceptanceCriteria:task.acceptanceCriteria.map(x=>clean(x,'acceptance criterion',500)),completion:{...task.completion,prompt:clean(task.completion.prompt,'completion prompt',1000)}}})}});const tasks=normalized.flatMap(x=>x.tasks);if(tasks.length<2||tasks.length>20)throw Error('project plan must contain 2 to 20 tasks');for(const t of tasks){if(new Set(t.dependsOn).size!==t.dependsOn.length||t.dependsOn.includes(t.key))throw Error('task cannot depend on itself or duplicate dependency');if(t.dependsOn.some(d=>!tk.has(d)))throw Error('task dependency does not exist')}
+const pref=s.project.learningPreferences;if(pref.practiceCapacity==='none'&&tasks.some(t=>t.kind==='implementation'))throw Error('practiceCapacity none forbids implementation tasks');if(pref.practiceCapacity!=='full'&&tasks.some(t=>t.completion.kind==='artifact'))throw Error('practiceCapacity forbids artifact completion');if(pref.mode==='knowledge-first'){if(tasks.filter(t=>t.kind==='lesson'||t.kind==='worked-example').length<Math.ceil(tasks.length/2))throw Error('knowledge-first requires at least half lesson or worked-example tasks');if(normalized.some(st=>!st.tasks.some(t=>t.kind==='lesson'||t.kind==='worked-example')))throw Error('knowledge-first requires a lesson or worked-example in every stage')}
+const visiting=new Set<string>(),visited=new Set<string>(),byKey=new Map(tasks.map(t=>[t.key,t]));const visit=(k:string)=>{if(visiting.has(k))throw Error('task dependency graph contains a cycle');if(visited.has(k))return;visiting.add(k);for(const d of byKey.get(k)!.dependsOn)visit(d);visiting.delete(k);visited.add(k)};tasks.forEach(t=>visit(t.key));const first=tasks.find(t=>!t.dependsOn.length);if(!first)throw Error('project plan has no executable task');const createdAt=now(),stages=normalized.map(st=>({id:`stage-${st.key}`,title:st.title,tasks:st.tasks.map(t=>({id:`task-${t.key}`,title:t.title,objective:t.objective,acceptanceCriteria:t.acceptanceCriteria,estimateMinutes:t.estimateMinutes,status:t.key===first.key?'active' as const:'pending' as const,conceptIds:[`concept-${t.conceptKey}`],dependsOn:t.dependsOn.map(d=>`concept-${byKey.get(d)!.conceptKey}`),kind:t.kind,completion:t.completion}))}));return bump({...s,plans:s.plans.map(p=>p.id===plan.id?{...p,stages}:p),mastery:tasks.map(t=>({conceptId:`concept-${t.conceptKey}`,title:t.conceptTitle,level:'introduced' as const,evidenceIds:[],rationale:'Introduced by generated plan; no evidence yet.',updatedAt:createdAt})),events:[...s.events,event('learnloop/plan-generated','Generated plan published',input.idempotencyKey),event('learnloop/task-activated',`First task activated: ${first.title}`)]})}
+export function nextAction(s:LearnLoopState){if(!s.project)return null;const tasks=activePlan(s).stages.flatMap(x=>x.tasks);return tasks.find(t=>t.status==='active')??tasks.find(t=>t.status==='pending'&&t.dependsOn.every(d=>tasks.some(x=>x.conceptIds.includes(d)&&x.status==='completed')))??null}
+export function startTask(s:LearnLoopState,input:{taskId:string;idempotencyKey:string}){if(s.events.some(x=>x.stableId===input.idempotencyKey))return s;if(!s.project)throw Error('project does not exist');const plan=activePlan(s),tasks=plan.stages.flatMap(x=>x.tasks),task=tasks.find(x=>x.id===input.taskId);if(!task)throw Error('task not found');if(task.status==='active')return s;if(task.status!=='pending'||nextAction(s)?.id!==task.id||tasks.some(x=>x.status==='active')||!task.dependsOn.every(d=>tasks.some(x=>x.conceptIds.includes(d)&&x.status==='completed')))throw Error('task is locked');const changed={...plan,stages:plan.stages.map(st=>({...st,tasks:st.tasks.map(x=>x.id===task.id?{...x,status:'active' as const}:x)}))};return bump({...s,plans:s.plans.map(x=>x.id===plan.id?changed:x),events:[...s.events,event('learnloop/task-started',`Task started: ${task.title}`,input.idempotencyKey)]})}
+export function setTaskState(s:LearnLoopState,input:{taskId:string;status:TaskState;idempotencyKey:string}){if(s.events.some(x=>x.stableId===input.idempotencyKey))return s;if(input.status==='active'||input.status==='completed'||input.status==='pending')throw Error(`task status ${input.status} requires a domain command`);const plan=activePlan(s),task=plan.stages.flatMap(x=>x.tasks).find(x=>x.id===input.taskId);if(!task)throw Error('task not found');if(!['pending','active','blocked'].includes(task.status)||task.status===input.status)throw Error('task transition is invalid');const changed={...plan,stages:plan.stages.map(st=>({...st,tasks:st.tasks.map(x=>x.id===task.id?{...x,status:input.status}:x)}))};return bump({...s,plans:s.plans.map(x=>x.id===plan.id?changed:x),events:[...s.events,event('learnloop/task-changed',`Task status changed to ${input.status}`,input.idempotencyKey)]})}
+function masteryFor(e:Evidence[]):{level:MasteryLevel;rationale:string}{const high=e.filter(x=>x.confidence>=.75),k=new Set(high.map(x=>x.kind));if(high.length>=3&&(k.has('assessment')||k.has('implementation')))return{level:'mastered',rationale:'Multiple strong evidence items.'};if(high.length>=2)return{level:'demonstrated',rationale:'Two strong evidence items.'};if(e.length)return{level:'practicing',rationale:`${e.length} evidence item(s).`};return{level:'introduced',rationale:'No evidence yet.'}}
+export function recordEvidence(s:LearnLoopState,input:Omit<Evidence,'id'|'createdAt'>){if(s.evidence.some(x=>x.idempotencyKey===input.idempotencyKey))return s;if(!s.mastery.some(x=>x.conceptId===input.conceptId))throw Error('concept not found');const saved={...input,id:id('evidence'),createdAt:now()},evidence=[...s.evidence,saved],mastery=s.mastery.map(m=>m.conceptId===saved.conceptId?{...m,...masteryFor(evidence.filter(x=>x.conceptId===m.conceptId)),evidenceIds:evidence.filter(x=>x.conceptId===m.conceptId).map(x=>x.id),updatedAt:now()}:m);return bump({...s,evidence,mastery,events:[...s.events,event('learnloop/evidence-recorded','Evidence recorded',input.idempotencyKey)]})}
+export function completeTaskWithEvidence(s:LearnLoopState,input:{idempotencyKey:string;taskId:string;conceptId:string;kind:Evidence['kind'];summary:string;source:Evidence['source'];confidence:number}){if(s.events.some(x=>x.stableId===input.idempotencyKey))return s;const plan=activePlan(s),task=plan.stages.flatMap(x=>x.tasks).find(x=>x.id===input.taskId);if(!task)throw Error('task not found');if(task.status==='completed')throw Error('task is already completed');if(task.status!=='active'||nextAction(s)?.id!==task.id)throw Error('task must be the current active task');if(!task.conceptIds.includes(input.conceptId))throw Error(s.mastery.some(x=>x.conceptId===input.conceptId)?'concept does not belong to task':'concept not found');const expected={ 'short-answer':'explanation',reflection:'reflection',artifact:'implementation'} as const;if(input.kind!==expected[task.completion.kind])throw Error('task completion evidence kind does not match requirement');const withEvidence=recordEvidence(s,input),p=activePlan(withEvidence),changed={...p,stages:p.stages.map(st=>({...st,tasks:st.tasks.map(x=>x.id===task.id?{...x,status:'completed' as const}:x)}))};return {...withEvidence,plans:withEvidence.plans.map(x=>x.id===p.id?changed:x),events:withEvidence.events.map(x=>x.stableId===input.idempotencyKey?{...x,type:'learnloop/task-completed-with-evidence'}:x)} }
+export function discardCurrentProject(s:LearnLoopState,key:string){if(s.events.some(x=>x.stableId===key))return s;if(!s.project)throw Error('project does not exist');return bump({...s,project:null,plans:[],evidence:[],mastery:[],assessments:[],adjustments:[],misconceptions:[],reviewQueue:[],events:[event('learnloop/project-discarded','Project discarded',key)]})}
+// Plan adjustments remain versioned and never activate/complete tasks through this generic path.
+function applyOperations(plan:PlanVersion,ops:PlanOperation[]){const stages=structuredClone(plan.stages),inverse:PlanOperation[]=[];for(const op of ops){const ss=stages.find(s=>s.tasks.some(t=>t.id===op.taskId)),task=ss?.tasks.find(t=>t.id===op.taskId);if(!ss||!task)throw Error('adjustment task not found');if(op.type==='update-task'){if(op.patch.status==='active'||op.patch.status==='completed')throw Error('adjustment cannot bypass task gate');const old=Object.fromEntries(Object.keys(op.patch).map(k=>[k,structuredClone(task[k as keyof typeof task])])) as Extract<PlanOperation,{type:'update-task'}>['patch'];inverse.unshift({type:'update-task',taskId:task.id,patch:old});Object.assign(task,structuredClone(op.patch))}else{const target=stages.find(s=>s.id===op.toStageId);if(!target)throw Error('adjustment target stage not found');const ix=ss.tasks.indexOf(task),before=ss.tasks[ix+1]?.id;ss.tasks.splice(ix,1);target.tasks.splice(op.beforeTaskId?target.tasks.findIndex(t=>t.id===op.beforeTaskId):target.tasks.length,0,task);inverse.unshift({type:'move-task',taskId:task.id,toStageId:ss.id,...(before?{beforeTaskId:before}:{})})}}return{stages,inverse}}
+function versionPlan(s:LearnLoopState,ops:PlanOperation[]){const current=activePlan(s),a=applyOperations(current,ops),version=Math.max(...s.plans.map(p=>p.version))+1,replacement={...structuredClone(current),id:id('plan'),version,createdAt:now(),status:'active' as const,stages:a.stages};return{state:{...s,plans:[...s.plans.map(p=>p.id===current.id?{...p,status:'superseded' as const}:p),replacement]},version,inverse:a.inverse}}
+export function proposeAdjustment(s:LearnLoopState,input:{impact:'minor'|'major';reason:string;diff:string[];operations:PlanOperation[];idempotencyKey:string}){if(s.adjustments.some(x=>x.idempotencyKey===input.idempotencyKey))return s;if(!input.operations.length)throw Error('adjustment requires at least one operation');const auto=input.impact==='minor'&&s.settings.autoMinorAdjustments;let proposal:AdjustmentProposal={id:id('adjustment'),...input,state:auto?'applied':'proposed',createdAt:now()},result={...s,adjustments:[...s.adjustments,proposal]};if(auto){const a=versionPlan(result,input.operations);proposal={...proposal,appliedPlanVersion:a.version,inverseOperations:a.inverse};result={...a.state,adjustments:a.state.adjustments.map(x=>x.id===proposal.id?proposal:x)}}return bump({...result,events:[...result.events,event(auto?'learnloop/adjustment-applied':'learnloop/adjustment-proposed',input.reason,input.idempotencyKey)]})}
+export function decideAdjustment(s:LearnLoopState,aid:string,decision:'apply'|'reject'|'revert',key:string){if(s.events.some(x=>x.stableId===key))return s;const target=s.adjustments.find(x=>x.id===aid);if(!target)throw Error('adjustment not found');let result=s,patch:Partial<AdjustmentProposal>;if(decision==='apply'){if(target.state!=='proposed')throw Error('adjustment decision invalid');const a=versionPlan(s,target.operations);result=a.state;patch={state:'applied',appliedPlanVersion:a.version,inverseOperations:a.inverse}}else if(decision==='revert'){if(target.state!=='applied')throw Error('adjustment decision invalid');const a=versionPlan(s,target.inverseOperations??[]);result=a.state;patch={state:'reverted',revertedPlanVersion:a.version}}else{if(target.state!=='proposed')throw Error('adjustment decision invalid');patch={state:'rejected'}}return bump({...result,adjustments:result.adjustments.map(x=>x.id===aid?{...x,...patch}:x),events:[...result.events,event(`learnloop/adjustment-${decision}`,'Adjustment decision',key)]})}
+export function updateSettings(s:LearnLoopState,settings:LearnLoopState['settings'],key:string){if(s.events.some(x=>x.stableId===key))return s;return bump({...s,settings,events:[...s.events,event('learnloop/settings-changed','Settings updated',key)]})}
+export function resetState(s:LearnLoopState,key:string){const x=emptyState(s.revision+1);x.events=[event('learnloop/reset','State reset',key)];return x}
+export async function ensureState(table:StateTable){const current=table.get('singleton');if(current)return current;const fresh=emptyState();await table.put('singleton',fresh);return fresh}
