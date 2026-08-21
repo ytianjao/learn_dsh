@@ -1,12 +1,12 @@
 import { expect, test, type Page } from '@playwright/test'
 
 async function openLearnLoopOnboarding(page: Page) {
-  const welcome = page.getByText(/^(你现在想学会什么？|What would you like to learn\?)$/)
+  const onboarding = page.getByRole('region', { name: 'LearnLoop onboarding' })
   const workspaceDialog = page.getByRole('dialog', { name: /^(选择工作区目录|Select Workspace Directory)$/ })
   const deadline = Date.now() + 15_000
 
   while (Date.now() < deadline) {
-    if (await welcome.isVisible().catch(() => false)) return
+    if (await onboarding.isVisible().catch(() => false)) return
 
     if (await workspaceDialog.isVisible().catch(() => false)) {
       const editPath = workspaceDialog.getByRole('button', { name: /^(编辑路径|Edit path)$/ })
@@ -38,22 +38,18 @@ async function openLearnLoopOnboarding(page: Page) {
     await page.waitForTimeout(200)
   }
 
-  await expect(welcome).toBeVisible()
+  await expect(onboarding).toBeVisible()
 }
 
 test('creates a durable learning project while its model-generated plan is pending', async ({ page }) => {
   await page.goto('/')
   await openLearnLoopOnboarding(page)
-  if (await page.getByText('What would you like to learn?').isVisible().catch(() => false)) {
-    await page.getByRole('button', { name: '中文' }).click()
-  }
-  await expect(page.getByText('你现在想学会什么？')).toBeVisible()
-  await page.getByRole('button', { name: 'English' }).click()
-  await expect(page.getByText('What would you like to learn?')).toBeVisible()
-  await page.getByRole('button', { name: '中文' }).click()
-  await expect(page.getByText('你现在想学会什么？')).toBeVisible()
+  const onboarding = page.getByRole('region', { name: 'LearnLoop onboarding' })
+  await expect(onboarding.getByRole('heading', { name: '选择你的学习方式' })).toBeVisible()
   await page.screenshot({ path: 'test-results/screenshots/welcome.png', fullPage: true })
-  await page.getByRole('region', { name: /LearnLoop 首次使用/ }).getByRole('textbox').fill('我有 5 年开发经验，做过 RAG；每周投入 10 小时，希望独立设计商业级 Agent 系统。')
+  await onboarding.getByRole('textbox', { name: /学习目标/ }).fill('独立设计商业级 Agent 系统。')
+  await onboarding.getByRole('textbox', { name: /已有经验/ }).fill('我有 5 年开发经验，做过 RAG。')
+  await expect(onboarding.getByRole('combobox', { name: '学习模式' })).toHaveValue('knowledge-first')
   await page.getByRole('button', { name: '开始学习' }).click()
   await expect(page.getByText('正在等待 DSH 模型生成学习计划')).toBeVisible()
   await page.screenshot({ path: 'test-results/screenshots/pending-plan.png', fullPage: true })
