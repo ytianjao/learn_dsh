@@ -14,6 +14,9 @@ export interface LearningTask {
   dependsOn: string[]
 }
 export interface Stage { id: string; title: string; tasks: LearningTask[] }
+export interface GeneratedPlanTaskInput { key: string; title: string; objective: string; acceptanceCriteria: string[]; estimateMinutes: number; conceptKey: string; conceptTitle: string; dependsOn: string[] }
+export interface GeneratedPlanStageInput { key: string; title: string; tasks: GeneratedPlanTaskInput[] }
+export interface GeneratedPlanInput { stages: GeneratedPlanStageInput[] }
 export interface PlanVersion { id: string; version: number; status: 'draft' | 'active' | 'superseded' | 'archived'; createdAt: string; stages: Stage[] }
 export interface Evidence { id: string; idempotencyKey: string; conceptId: string; kind: 'explanation' | 'pseudocode' | 'implementation' | 'hypothesis' | 'assessment' | 'reflection'; summary: string; source: { sessionId: string; messageRange: string }; confidence: number; createdAt: string }
 export interface MasteryState { conceptId: string; title: string; level: MasteryLevel; evidenceIds: string[]; rationale: string; updatedAt: string }

@@ -50,8 +50,10 @@ jobs:
           pnpm --dir dsh-source run mock:llm \
             --host 127.0.0.1 \
             --port 8000 \
-            --sequence success \
+            --sequence tool_call_success,success \
             --repeat-last \
+            --tool-name learnloop_publish_plan \
+            --tool-arguments '{"stages":[{"key":"mock-stage","title":"Mock Generated Stage","tasks":[{"key":"mock-runtime","title":"Mock Generated Runtime Task","objective":"Learn generated behavior","acceptanceCriteria":["Explain generated behavior"],"estimateMinutes":30,"conceptKey":"mock-runtime","conceptTitle":"Mock Runtime","dependsOn":[]},{"key":"mock-practice","title":"Mock Generated Practice","objective":"Practice generated behavior","acceptanceCriteria":["Complete deterministic practice"],"estimateMinutes":30,"conceptKey":"mock-practice","conceptTitle":"Mock Practice","dependsOn":["mock-runtime"]}]}]}' \
             --success-text 'Mock LearnLoop teaching response.' \
             >mock-provider.log 2>&1 &
           echo $! >mock-provider.pid

@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { z } from 'zod'
-import { completeTaskWithEvidence, decideAdjustment, emptyState, initializeProject, nextAction, proposeAdjustment, recordEvidence, resetState, setTaskState, updateSettings } from './domain.js'
+import { completeTaskWithEvidence, decideAdjustment, discardCurrentProject, emptyState, initializeProject, nextAction, proposeAdjustment, recordEvidence, resetState, setTaskState, updateSettings } from './domain.js'
 import type { LearnLoopState, StateTable } from './types.js'
 
 export const API_PATH = '/learnloop/api/v1/state'
@@ -25,6 +25,7 @@ const mutationSchema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('adjustment'), ...common, impact: z.enum(['minor', 'major']), reason: z.string().trim().min(1).max(1000), diff: z.array(z.string().trim().min(1).max(500)).min(1).max(20), operations: z.array(operation).min(1).max(20) }).strict(),
   z.object({ action: z.literal('adjustment-decision'), ...common, adjustmentId: z.string().trim().min(1).max(200), decision: z.enum(['apply', 'reject', 'revert']) }).strict(),
   z.object({ action: z.literal('settings'), ...common, language: z.enum(['zh-CN', 'en']), weeklyHours: z.number().int().min(1).max(80), strictness: z.enum(['supportive', 'balanced', 'strict']), autoMinorAdjustments: z.boolean(), showModeExplanation: z.boolean(), antiDependency: z.boolean() }).strict(),
+  z.object({ action: z.literal('discard-project'), ...common }).strict(),
   z.object({ action: z.literal('reset'), ...common }).strict(),
 ])
 
@@ -49,6 +50,7 @@ export function createLearnLoopHttpHandler(table: StateTable) {
         if (input.action === 'adjustment') return proposeAdjustment(current, input)
         if (input.action === 'adjustment-decision') return decideAdjustment(current, input.adjustmentId, input.decision, input.idempotencyKey)
         if (input.action === 'settings') return updateSettings(current, { language: input.language, weeklyHours: input.weeklyHours, strictness: input.strictness, autoMinorAdjustments: input.autoMinorAdjustments, showModeExplanation: input.showModeExplanation, antiDependency: input.antiDependency }, input.idempotencyKey)
+        if (input.action === 'discard-project') return discardCurrentProject(current, input.idempotencyKey)
         return resetState(current, input.idempotencyKey)
       })
       json(res, 200, snapshot(updated))

@@ -18,6 +18,15 @@ Automated gates cover domain invariants, adjustment apply/revert, evidence and m
 
 ## 限制 / Limitations
 
-rc.8 Client Module 格式仍是 prerelease。初始课程是明确标注的 Agent 工程模板；没有后台付费生成调用。JSON export 是审计副本，完整恢复使用 DSH Home backup。
+rc.8 Client Module 格式仍是 prerelease。计划请求通过当前 DSH Chat 和所选模型执行，LearnLoop 不读取凭据。JSON export 是审计副本，完整恢复使用 DSH Home backup。
 
-The rc.8 Client Module format remains prerelease. The initial curriculum is an explicitly disclosed Agent-engineering template with no paid background generation call. JSON export is an audit copy; complete restore uses DSH Home backup.
+The rc.8 Client Module format remains prerelease. Planning uses the current DSH Chat and selected model without exposing credentials to LearnLoop. JSON export is an audit copy; complete restore uses DSH Home backup.
+
+
+## DSH Chat generated plans (PR #13)
+
+LearnLoop now creates an empty active plan and sends a structured planning request through the public DSH Chat `InputActions`. The selected DSH model must publish the complete authoritative plan with `learnloop_publish_plan`; LearnLoop never reads API keys, calls a provider, or parses assistant prose. The Host validates keys, sizes, uniqueness, dependency references and DAG shape, then assigns IDs/status/version and commits plan, mastery, events, and one revision atomically.
+
+User flow: (1) configure and select a model in **DSH Settings → Models**; (2) enter a LearnLoop goal; (3) choose **Start learning**; (4) observe the planning request in Chat; (5) the model calls `learnloop_publish_plan`; (6) the model introduces the returned first task; (7) choose **Start task in chat** for teaching; (8) submit your own evidence in LearnLoop; (9) export before using **Discard current plan** to start over. Normal `dsh web` uses the selected user model; only browser E2E uses the deterministic mock provider.
+
+DSH owns session, Chat, model routing, streaming, credentials, and the tool execution runtime. LearnLoop owns the learning project, validated structured plan, evidence, mastery, review, and plan-publication rules. Discard is destructive, not history archival: it removes current business data while preserving settings. Export first when an audit copy is required.
