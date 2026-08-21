@@ -9,9 +9,9 @@ async function openLearnLoopOnboarding(page: Page) {
 
     for (const action of [
       page.getByText('Continue', { exact: true }),
-      page.getByRole('button', { name: 'Choose workspace', exact: true }),
       page.getByRole('button', { name: 'Open', exact: true }),
       page.getByText('Configure later', { exact: true }),
+      page.getByRole('button', { name: 'Choose workspace', exact: true }),
     ]) {
       if (await action.isVisible().catch(() => false)) {
         await action.click()
