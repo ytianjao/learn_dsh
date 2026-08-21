@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { completeTaskWithEvidence, decideAdjustment, emptyState, initializeProject, nextAction, proposeAdjustment, publishGeneratedPlan, recordEvidence, resetState, setTaskState, updateSettings } from '../src/domain.js'
+import { completeTaskWithEvidence, decideAdjustment, emptyState, initializeProject, learnLoopDomainSpec, nextAction, proposeAdjustment, publishGeneratedPlan, recordEvidence, resetState, setTaskState, updateSettings } from '../src/domain.js'
 import type { GeneratedPlanInput } from '../src/types.js'
 
 export const generatedPlan = { stages: [
@@ -14,6 +14,10 @@ export const generatedPlan = { stages: [
 ] } satisfies GeneratedPlanInput
 function project() { return publishGeneratedPlan(initializeProject(emptyState(), { goal: '掌握商业级 Agent 系统', experience: '5 年开发，做过 RAG', weeklyHours: 10, sessionId: 'session-a', learningPreferences: { mode: 'balanced', practiceCapacity: 'light', explanationDepth: 'standard', exampleDensity: 'standard', additionalNotes: '' }, idempotencyKey: 'init-1' }), { ...generatedPlan, idempotencyKey: 'plan-1' }) }
 describe('LearnLoop domain / LearnLoop 领域模型', () => {
+  it('keeps the storage unit compatible while values migrate to schema v2', () => {
+    expect(learnLoopDomainSpec.version).toBe(1)
+    expect(emptyState().schemaVersion).toBe(2)
+  })
   it('publishes one immutable active plan and applies a real operation', () => {
     const state = project(), task = nextAction(state)!
     const adjusted = proposeAdjustment(state, { impact: 'minor', reason: '延长练习 / Extend practice', diff: ['45m → 60m'], operations: [{ type: 'update-task', taskId: task.id, patch: { estimateMinutes: 60 } }], idempotencyKey: 'minor-1' })

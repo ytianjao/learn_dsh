@@ -29,7 +29,10 @@ export function migrateStateV1ToV2(value: LegacyState): LearnLoopState {
   }
 }
 const persistedSchema=z.preprocess(value=>{if(value&&typeof value==='object'&&'schemaVersion'in value&&(value as {schemaVersion:unknown}).schemaVersion===1)return migrateStateV1ToV2(value as LegacyState);return value},stateV2Schema)
-export const learnLoopDomainSpec={name:'learnloop',version:2,tables:{state:{valueSchema:persistedSchema}}} as const satisfies DomainSpec
+// The storage unit version describes the backend's physical format, not the
+// schemaVersion stored inside each LearnLoop value. Keep it at 1 so existing
+// installations can open their unit and let persistedSchema migrate v1 data.
+export const learnLoopDomainSpec={name:'learnloop',version:1,tables:{state:{valueSchema:persistedSchema}}} as const satisfies DomainSpec
 export function emptyState(revision=0):LearnLoopState{return {schemaVersion:2,revision,project:null,plans:[],evidence:[],mastery:[],assessments:[],adjustments:[],events:[],misconceptions:[],reviewQueue:[],settings:{language:'zh-CN',weeklyHours:10,strictness:'balanced',autoMinorAdjustments:true,showModeExplanation:false,antiDependency:true}}}
 function event(type:string,summary:string,stableId=id('evt')){return{id:id('event'),stableId,type,summary,createdAt:now()}}
 function activePlan(s:LearnLoopState){const p=s.plans.filter(x=>x.status==='active');if(p.length!==1)throw Error('project must have exactly one active plan');return p[0]!}
