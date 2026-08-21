@@ -6,3 +6,8 @@ playwright-report/
 .DS_Store
 dist/
 __pycache__/
+.pytest_cache/
+.dsh-learnloop-acceptance/
+*.log
+*.pid
+/dsh-source/

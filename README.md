@@ -22,6 +22,9 @@ Install, build, keyless tests, plan/progress, replay, and package validation do 
 ## 安装与启动 / Install and start
 
 ```bash
+corepack enable
+pnpm install --frozen-lockfile
+pnpm run build
 npm install --legacy-peer-deps
 npm run build
 dsh plugin --profile web add .
@@ -57,6 +60,15 @@ Plan adjustments contain machine-applicable structured operations plus a reviewa
 
 ## 备份、升级与卸载 / Backup, upgrade, and uninstall
 
+
+Every write checks a monotonic revision inside the Storage Domain's atomic `update`. Retryable mutations carry idempotency keys. Reset clears learning data without rolling the revision backward.
+
+计划调整包含可执行的结构化操作和便于审阅的 diff。小调整可自动生成新计划版本；大调整必须批准。撤销操作会应用已保存的逆操作并生成另一个不可变计划版本。
+
+Plan adjustments contain machine-applicable structured operations plus a reviewable diff. Minor changes may create a new plan version automatically; major changes require approval. Revert applies stored inverse operations and creates another immutable version.
+
+## 备份、升级与卸载 / Backup, upgrade, and uninstall
+
 在 LearnLoop 设置中选择“导出 / 备份”。JSON 是便携审计副本；完整恢复仍使用 DSH Home 备份流程。卸载前可先导出，然后执行：
 
 Choose “Export / Backup” in LearnLoop settings. JSON is a portable audit copy; complete restore still uses the DSH Home backup procedure. Export first if needed, then uninstall with:
@@ -72,6 +84,14 @@ After an upgrade, run `npm run test:compat` and manually verify Plan, Progress, 
 ## 开发与检查 / Development and checks
 
 ```bash
+corepack enable
+pnpm install --frozen-lockfile
+pnpm run build
+pnpm run typecheck
+pnpm run lint
+pnpm test
+pnpm run test:e2e
+pnpm run package:validate
 npm install --legacy-peer-deps
 npm run build
 npm run typecheck

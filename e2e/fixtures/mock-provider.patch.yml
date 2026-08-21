@@ -1,0 +1,18 @@
+# Keyless local provider for PR browser tests. / PR 浏览器测试使用的无密钥本机 provider。
+- id: agent-default-model
+  config:
+    provider: learnloop-mock
+    model: mock-model
+
+- id: llm-pi-ai
+  config:
+    providers:
+      learnloop-mock:
+        displayName: LearnLoop CI Mock
+        api: openai-completions
+        baseURL: http://127.0.0.1:8000/v1
+        models:
+          - id: mock-model
+            name: Mock Model
+            contextWindow: 65536
+            maxTokens: 4096
