@@ -70,7 +70,7 @@ jobs:
         run: pnpm run acceptance:prepare
       - name: Start DSH Web on loopback
         run: |
-          node "$DSH_BIN" web --patch e2e/fixtures/mock-provider.patch.yml --host 127.0.0.1 --port 3080 --no-open >dsh-web.log 2>&1 &
+          DSH_HOME="$HOME/.dsh-learnloop-acceptance" node "$DSH_BIN" web --patch e2e/fixtures/mock-provider.patch.yml --host 127.0.0.1 --port 3080 --no-open >dsh-web.log 2>&1 &
           echo $! >dsh-web.pid
           timeout 60 bash -c 'until curl --fail --silent http://127.0.0.1:3080/ >/dev/null; do sleep 1; done'
       - name: Run LearnLoop browser acceptance
