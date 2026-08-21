@@ -26,7 +26,11 @@ async function openLearnLoopOnboarding(page: Page) {
       page.getByRole('button', { name: 'Choose workspace', exact: true }),
     ]) {
       if (await action.isVisible().catch(() => false)) {
-        await action.click()
+        // The host can render its workspace control just beyond the viewport
+        // while the navigation drawer is animating. A DOM click still follows
+        // the same application path without Playwright waiting indefinitely for
+        // the transient host layout to become actionable.
+        await action.evaluate((element: HTMLElement) => element.click())
         break
       }
     }
