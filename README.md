@@ -25,6 +25,8 @@ Install, build, keyless tests, plan/progress, replay, and package validation do 
 corepack enable
 pnpm install --frozen-lockfile
 pnpm run build
+npm install --legacy-peer-deps
+npm run build
 dsh plugin --profile web add .
 dsh --profile web --dump-config
 dsh web
@@ -58,6 +60,15 @@ Plan adjustments contain machine-applicable structured operations plus a reviewa
 
 ## 备份、升级与卸载 / Backup, upgrade, and uninstall
 
+
+Every write checks a monotonic revision inside the Storage Domain's atomic `update`. Retryable mutations carry idempotency keys. Reset clears learning data without rolling the revision backward.
+
+计划调整包含可执行的结构化操作和便于审阅的 diff。小调整可自动生成新计划版本；大调整必须批准。撤销操作会应用已保存的逆操作并生成另一个不可变计划版本。
+
+Plan adjustments contain machine-applicable structured operations plus a reviewable diff. Minor changes may create a new plan version automatically; major changes require approval. Revert applies stored inverse operations and creates another immutable version.
+
+## 备份、升级与卸载 / Backup, upgrade, and uninstall
+
 在 LearnLoop 设置中选择“导出 / 备份”。JSON 是便携审计副本；完整恢复仍使用 DSH Home 备份流程。卸载前可先导出，然后执行：
 
 Choose “Export / Backup” in LearnLoop settings. JSON is a portable audit copy; complete restore still uses the DSH Home backup procedure. Export first if needed, then uninstall with:
@@ -66,9 +77,9 @@ Choose “Export / Backup” in LearnLoop settings. JSON is a portable audit cop
 dsh plugin --profile web remove @learnloop/dsh-learnloop
 ```
 
-升级后应运行 `pnpm run test:compat`，并人工验证 Plan、Progress 和 Review。卸载不会删除 DSH 模型凭据。
+升级后应运行 `npm run test:compat`，并人工验证 Plan、Progress 和 Review。卸载不会删除 DSH 模型凭据。
 
-After an upgrade, run `pnpm run test:compat` and manually verify Plan, Progress, and Review. Uninstalling does not delete DSH model credentials.
+After an upgrade, run `npm run test:compat` and manually verify Plan, Progress, and Review. Uninstalling does not delete DSH model credentials.
 
 ## 开发与检查 / Development and checks
 
@@ -81,6 +92,13 @@ pnpm run lint
 pnpm test
 pnpm run test:e2e
 pnpm run package:validate
+npm install --legacy-peer-deps
+npm run build
+npm run typecheck
+npm run lint
+npm test
+npm run test:e2e
+npm run package:validate
 ```
 
 浏览器 E2E 需要已运行的 DSH Web fixture，地址由 `DSH_WEB_URL` 指定，默认是 `http://127.0.0.1:3080`。常规检查不会调用模型提供商。
@@ -88,7 +106,3 @@ pnpm run package:validate
 Browser E2E requires a running DSH Web fixture at `DSH_WEB_URL`, defaulting to `http://127.0.0.1:3080`. Routine checks never call a model provider.
 
 架构和验收资料 / Architecture and acceptance references: `docs/DSH_BASELINE.md`, `docs/PRODUCT_CONTRACT.md`, `docs/WEB_ACCEPTANCE.md`, and `docs/UPSTREAM_COMPATIBILITY.md`.
-
-PR → Actions → Codespaces 的完整云端验收流程见 `docs/CLOUD_ACCEPTANCE.md`，浏览器检查表见 `docs/ACCEPTANCE_SCENARIOS.md`。
-
-See `docs/CLOUD_ACCEPTANCE.md` for the complete PR → Actions → Codespaces lane and `docs/ACCEPTANCE_SCENARIOS.md` for the browser checklist.
