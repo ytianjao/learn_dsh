@@ -1,16 +1,35 @@
-import { expect, test } from '@playwright/test'
+import { expect, test, type Page } from '@playwright/test'
+
+async function openLearnLoopOnboarding(page: Page) {
+  const welcome = page.getByText(/^(你现在想学会什么？|What would you like to learn\?)$/)
+  const deadline = Date.now() + 15_000
+
+  while (Date.now() < deadline) {
+    if (await welcome.isVisible().catch(() => false)) return
+
+    for (const action of [
+      page.getByText('Continue', { exact: true }),
+      page.getByRole('button', { name: 'Choose workspace', exact: true }),
+      page.getByRole('button', { name: 'Open', exact: true }),
+      page.getByText('Configure later', { exact: true }),
+    ]) {
+      if (await action.isVisible().catch(() => false)) {
+        await action.click()
+        break
+      }
+    }
+
+    await page.waitForTimeout(200)
+  }
+
+  await expect(welcome).toBeVisible()
+}
+
 test('creates a durable learning project and exposes all LearnLoop views', async ({ page }) => {
   await page.goto('/')
-  await page.waitForTimeout(1000)
-  for (const label of ['Continue', 'Configure later']) {
-    const action = page.getByText(label, { exact: true })
-    if (await action.isVisible().catch(() => false)) await action.click()
-  }
-  if (await page.getByText('你现在想学会什么？').count() === 0) {
-    await page.getByRole('button', { name: 'Choose workspace' }).click()
-    await page.getByRole('button', { name: 'Open' }).click()
-    const configureLater = page.getByText('Configure later', { exact: true })
-    if (await configureLater.isVisible().catch(() => false)) await configureLater.click()
+  await openLearnLoopOnboarding(page)
+  if (await page.getByText('What would you like to learn?').isVisible().catch(() => false)) {
+    await page.getByRole('button', { name: '中文' }).click()
   }
   await expect(page.getByText('你现在想学会什么？')).toBeVisible()
   await page.getByRole('button', { name: 'English' }).click()
