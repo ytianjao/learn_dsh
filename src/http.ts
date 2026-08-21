@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { z } from 'zod'
-import { completeTaskWithEvidence, decideAdjustment, discardCurrentProject, emptyState, initializeProject, nextAction, proposeAdjustment, recordEvidence, resetState, setTaskState, updateSettings } from './domain.js'
+import { bindProjectSession, completeTaskWithEvidence, decideAdjustment, discardCurrentProject, emptyState, initializeProject, nextAction, proposeAdjustment, recordEvidence, resetState, setTaskState, startTask, updateSettings } from './domain.js'
 import type { LearnLoopState, StateTable } from './types.js'
 
 export const API_PATH = '/learnloop/api/v1/state'
@@ -13,12 +13,15 @@ function snapshot(state: LearnLoopState) { return { ...state, nextAction: nextAc
 const idempotencyKey = z.string().trim().min(1).max(200)
 const common = { revision: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER), idempotencyKey }
 const taskState = z.enum(['pending', 'active', 'blocked', 'completed', 'skipped'])
+const learningPreferences = z.object({ mode: z.enum(['knowledge-first', 'balanced', 'practice-first']), practiceCapacity: z.enum(['none', 'light', 'full']), explanationDepth: z.enum(['standard', 'deep']), exampleDensity: z.enum(['standard', 'high']), additionalNotes: z.string().max(2000) }).strict()
 const operation = z.discriminatedUnion('type', [
   z.object({ type: z.literal('update-task'), taskId: z.string().trim().min(1).max(200), patch: z.object({ title: z.string().trim().min(1).max(500).optional(), objective: z.string().trim().min(1).max(2000).optional(), acceptanceCriteria: z.array(z.string().trim().min(1).max(500)).max(20).optional(), estimateMinutes: z.number().int().min(1).max(10_000).optional(), status: taskState.optional() }).strict().refine(value => Object.keys(value).length > 0, 'patch must not be empty') }).strict(),
   z.object({ type: z.literal('move-task'), taskId: z.string().trim().min(1).max(200), toStageId: z.string().trim().min(1).max(200), beforeTaskId: z.string().trim().min(1).max(200).optional() }).strict().refine(value => value.beforeTaskId !== value.taskId, 'a task cannot be moved before itself'),
 ])
 const mutationSchema = z.discriminatedUnion('action', [
-  z.object({ action: z.literal('initialize'), ...common, goal: z.string().trim().min(1).max(4000), experience: z.string().max(2000), weeklyHours: z.number().int().min(1).max(80) }).strict(),
+  z.object({ action: z.literal('initialize'), ...common, goal: z.string().trim().min(1).max(4000), experience: z.string().trim().min(1).max(2000), weeklyHours: z.number().int().min(1).max(80), sessionId: z.string().trim().min(1).max(200), learningPreferences }).strict(),
+  z.object({ action: z.literal('bind-session'), ...common, sessionId: z.string().trim().min(1).max(200) }).strict(),
+  z.object({ action: z.literal('start-task'), ...common, taskId: z.string().trim().min(1).max(200) }).strict(),
   z.object({ action: z.literal('task-state'), ...common, taskId: z.string().trim().min(1).max(200), status: taskState }).strict(),
   z.object({ action: z.literal('evidence'), ...common, conceptId: z.string().trim().min(1).max(200), kind: z.enum(['explanation', 'pseudocode', 'implementation', 'hypothesis', 'assessment', 'reflection']), summary: z.string().trim().min(1).max(1000), sessionId: z.string().trim().min(1).max(200), messageRange: z.string().trim().min(1).max(200), confidence: z.number().finite().min(0).max(1) }).strict(),
   z.object({ action: z.literal('complete-task-with-evidence'), ...common, taskId: z.string().trim().min(1).max(200), conceptId: z.string().trim().min(1).max(200), kind: z.enum(['explanation', 'pseudocode', 'implementation', 'hypothesis', 'assessment', 'reflection']), summary: z.string().trim().min(1).max(1000), sessionId: z.string().trim().min(1).max(200), messageRange: z.string().trim().min(1).max(200), confidence: z.number().finite().min(0).max(1) }).strict(),
@@ -44,6 +47,8 @@ export function createLearnLoopHttpHandler(table: StateTable) {
         if (current.events.some(item => item.stableId === input.idempotencyKey)) return current
         if (current.revision !== input.revision) throw new RequestError(409, 'Learning state changed. Refresh and retry. / 学习状态已变化，请刷新后重试。')
         if (input.action === 'initialize') return initializeProject(current, input)
+        if (input.action === 'bind-session') return bindProjectSession(current, input)
+        if (input.action === 'start-task') return startTask(current, input)
         if (input.action === 'task-state') return setTaskState(current, input)
         if (input.action === 'evidence') return recordEvidence(current, { idempotencyKey: input.idempotencyKey, conceptId: input.conceptId, kind: input.kind, summary: input.summary, source: { sessionId: input.sessionId, messageRange: input.messageRange }, confidence: input.confidence })
         if (input.action === 'complete-task-with-evidence') return completeTaskWithEvidence(current, { idempotencyKey: input.idempotencyKey, taskId: input.taskId, conceptId: input.conceptId, kind: input.kind, summary: input.summary, source: { sessionId: input.sessionId, messageRange: input.messageRange }, confidence: input.confidence })

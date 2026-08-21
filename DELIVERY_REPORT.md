@@ -30,3 +30,6 @@ LearnLoop now creates an empty active plan and sends a structured planning reque
 User flow: (1) configure and select a model in **DSH Settings → Models**; (2) enter a LearnLoop goal; (3) choose **Start learning**; (4) observe the planning request in Chat; (5) the model calls `learnloop_publish_plan`; (6) the model introduces the returned first task; (7) choose **Start task in chat** for teaching; (8) submit your own evidence in LearnLoop; (9) export before using **Discard current plan** to start over. Normal `dsh web` uses the selected user model; only browser E2E uses the deterministic mock provider.
 
 DSH owns session, Chat, model routing, streaming, credentials, and the tool execution runtime. LearnLoop owns the learning project, validated structured plan, evidence, mastery, review, and plan-publication rules. Discard is destructive, not history archival: it removes current business data while preserving settings. Export first when an audit copy is required.
+
+## Runtime v2 delivery
+LearnLoop now separates visible intent from Host-owned control policy, captures explicit learning modes, migrates schema v1, binds projects to DSH sessions, and gates progression through `startTask` and atomic evidence completion. Semantic model-output filtering remains a non-goal.

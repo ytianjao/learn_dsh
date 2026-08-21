@@ -97,3 +97,17 @@ LearnLoop now creates an empty active plan and sends a structured planning reque
 User flow: (1) configure and select a model in **DSH Settings → Models**; (2) enter a LearnLoop goal; (3) choose **Start learning**; (4) observe the planning request in Chat; (5) the model calls `learnloop_publish_plan`; (6) the model introduces the returned first task; (7) choose **Start task in chat** for teaching; (8) submit your own evidence in LearnLoop; (9) export before using **Discard current plan** to start over. Normal `dsh web` uses the selected user model; only browser E2E uses the deterministic mock provider.
 
 DSH owns session, Chat, model routing, streaming, credentials, and the tool execution runtime. LearnLoop owns the learning project, validated structured plan, evidence, mastery, review, and plan-publication rules. Discard is destructive, not history archival: it removes current business data while preserving settings. Export first when an audit copy is required.
+
+## Learning modes and progression (runtime v2)
+
+1. Choose a learning mode and current practice capacity.
+2. Enter the learning goal, prior experience, weekly time, explanation depth, and example density.
+3. Start learning. Chat receives exactly the original trimmed goal; LearnLoop control context is contributed to the DSH request/header and Trajectory through a session-scoped System Prompt.
+4. The model may teach only the current task. **Continue this lesson** expands that lesson; it does not change authoritative state.
+5. Submit the inline lesson check before the next lesson unlocks, then explicitly start it.
+
+`knowledge-first` emphasizes systematic explanations, boundaries, misconceptions, and multiple worked examples; `balanced` combines explanation and moderate exercises; `practice-first` emphasizes deliverables only when explicitly selected. Practice capacity `none` forbids implementation and artifact requirements, `light` permits small exercises but no artifact gate, and `full` permits normal implementation work.
+
+LearnLoop binds a project to the public DSH session ID. Other sessions receive no LearnLoop System Prompt and cannot publish that project's plan. Legacy v1 projects migrate without data loss and remain unbound until the user explicitly binds the current session.
+
+> Limitation: LearnLoop does not semantically filter arbitrary model prose. Domain transitions are deterministic; recurring model behavior is constrained by DSH System Prompt. Inline evidence currently uses `learnloop-inline-checkpoint` until real message references are integrated.
