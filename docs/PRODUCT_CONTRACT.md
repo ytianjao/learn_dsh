@@ -36,6 +36,10 @@ Host 是唯一权威状态。每个 mutation 在原子更新中检查单调 revi
 
 The Host is the sole authority. Every mutation checks a monotonic revision inside an atomic update and safely handles retries by idempotency key. Reset must never roll the revision backward.
 
+通过当前任务界面完成任务并提交证据时，Evidence、Mastery 和 Task 状态在同一个 Host 原子更新中提交。
+
+When a task is completed with evidence from the current-task interface, Evidence, Mastery, and Task state are committed in the same atomic Host update.
+
 ## 隐私与安全 / Privacy and security
 
 LearnLoop 不接收模型密钥。变更接口要求同源、JSON content type、专用 mutation header、严格运行时 schema 和 128 KiB 请求上限。导出包含学习数据，用户应按敏感数据保护。

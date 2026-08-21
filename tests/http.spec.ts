@@ -30,4 +30,30 @@ describe('LearnLoop HTTP projection / LearnLoop HTTP 投影', () => {
     [{ action: 'adjustment', impact: 'unknown', reason: 'x', diff: ['x'], operations: [] }, 400],
   ])('rejects malformed mutations', async (payload, expected) => { const call = request(payload); await run(new Table(), call); expect(call.status()).toBe(expected) })
   it('rejects malformed and cross-origin requests', async () => { for (const origin of ['not a url', 'https://evil.example']) { const call = request({ action: 'reset' }, 0, { origin }); await run(new Table(), call); expect(call.status()).toBe(403) } })
+  it('atomically completes a task with evidence in one revision and supports stale retry', async () => {
+    const table = new Table(), initialized = request({ action: 'initialize', goal: '学习 Agent', experience: 'RAG', weeklyHours: 10, idempotencyKey: 'init' }); await run(table, initialized)
+    const payload = { action: 'complete-task-with-evidence', taskId: 'task-runtime-state', conceptId: 'runtime-state', kind: 'explanation', summary: '状态和 checkpoint 分工明确', sessionId: 'browser', messageRange: 'manual-submission', confidence: .72, idempotencyKey: 'complete' }
+    const complete = request(payload, 1); await run(table, complete)
+    expect(complete.status()).toBe(200); expect(table.state.revision).toBe(2); expect(table.state.evidence).toHaveLength(1); expect(table.state.mastery[0]?.level).toBe('practicing'); expect(table.state.plans[0]?.stages[0]?.tasks[0]?.status).toBe('completed')
+    const retry = request(payload, 1); await run(table, retry)
+    expect(retry.status()).toBe(200); expect(table.state.revision).toBe(2); expect(table.state.evidence).toHaveLength(1)
+  })
+  it('allows only one concurrent atomic completion at the same revision', async () => {
+    const table = new Table(), initialized = request({ action: 'initialize', goal: '学习 Agent', experience: 'RAG', weeklyHours: 10, idempotencyKey: 'init' }); await run(table, initialized)
+    const base = { action: 'complete-task-with-evidence', taskId: 'task-runtime-state', conceptId: 'runtime-state', kind: 'explanation', summary: 'evidence', sessionId: 'browser', messageRange: 'manual-submission', confidence: .72 }
+    const first = request({ ...base, idempotencyKey: 'complete-a' }, 1), second = request({ ...base, idempotencyKey: 'complete-b' }, 1)
+    await Promise.all([run(table, first), run(table, second)])
+    expect([first.status(), second.status()].sort()).toEqual([200, 409]); expect(table.state.revision).toBe(2); expect(table.state.evidence).toHaveLength(1); expect(table.state.plans[0]?.stages[0]?.tasks[0]?.status).toBe('completed')
+  })
+  it.each([
+    { taskId: 'task-runtime-state', conceptId: 'runtime-state', kind: 'explanation', summary: '', sessionId: 'browser', messageRange: 'manual-submission', confidence: .72 },
+    { taskId: 'task-runtime-state', conceptId: 'runtime-state', kind: 'explanation', summary: 'x', sessionId: 'browser', messageRange: 'manual-submission', confidence: 2 },
+    { taskId: 'task-runtime-state', conceptId: 'runtime-state', kind: 'magic', summary: 'x', sessionId: 'browser', messageRange: 'manual-submission', confidence: .72 },
+    { conceptId: 'runtime-state', kind: 'explanation', summary: 'x', sessionId: 'browser', messageRange: 'manual-submission', confidence: .72 },
+  ])('rejects malformed atomic completion input', async payload => { const call = request({ action: 'complete-task-with-evidence', ...payload }); await run(new Table(), call); expect(call.status()).toBe(400) })
+  it('leaves no partial state when atomic completion domain validation fails', async () => {
+    const table = new Table(), initialized = request({ action: 'initialize', goal: '学习 Agent', experience: 'RAG', weeklyHours: 10, idempotencyKey: 'init' }); await run(table, initialized)
+    const call = request({ action: 'complete-task-with-evidence', taskId: 'task-runtime-state', conceptId: 'planner-verifier', kind: 'explanation', summary: 'x', sessionId: 'browser', messageRange: 'manual-submission', confidence: .72, idempotencyKey: 'invalid-concept' }, 1); await run(table, call)
+    expect(call.status()).toBe(400); expect(table.state.revision).toBe(1); expect(table.state.evidence).toHaveLength(0); expect(table.state.plans[0]?.stages[0]?.tasks[0]?.status).toBe('active')
+  })
 })
