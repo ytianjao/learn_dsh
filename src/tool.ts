@@ -25,8 +25,7 @@ export function createLearnLoopPublishPlanTool(table: StateTable) {
       if (!exec.agent) throw new Error('learnloop_publish_plan requires an agent execution')
       if (exec.signal.aborted) throw exec.signal.reason
       const updated = await table.update('singleton', state => {
-        if (!state.project || state.project.sessionId !== exec.agent!.id) throw new Error('learnloop_publish_plan session does not own this project')
-        return publishGeneratedPlan(state, { stages: args.stages, idempotencyKey: `learnloop-plan:${exec.callId}` })
+        return publishGeneratedPlan(state, { stages: args.stages, sessionId: exec.agent!.id, idempotencyKey: `learnloop-plan:${exec.callId}` })
       })
       if (exec.signal.aborted) throw exec.signal.reason
       const plan = updated.plans.find(item => item.status === 'active')!

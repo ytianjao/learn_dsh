@@ -6,6 +6,8 @@ export type LearningMode = 'knowledge-first' | 'balanced' | 'practice-first'
 export type PracticeCapacity = 'none' | 'light' | 'full'
 export type ExplanationDepth = 'standard' | 'deep'
 export type ExampleDensity = 'standard' | 'high'
+export type ProjectAccess = 'none' | 'owner' | 'foreign' | 'unbound' | 'settings-only'
+export type LearnLoopErrorCode = 'PROJECT_NOT_FOUND' | 'PROJECT_ALREADY_EXISTS' | 'PROJECT_UNBOUND' | 'SESSION_MISMATCH' | 'PLAN_NOT_PUBLISHED' | 'TASK_NOT_FOUND' | 'TASK_LOCKED' | 'INVALID_TASK_TRANSITION' | 'EVIDENCE_MISMATCH' | 'ADJUSTMENT_NOT_FOUND' | 'INVALID_ADJUSTMENT'
 export interface LearningPreferences { mode: LearningMode; practiceCapacity: PracticeCapacity; explanationDepth: ExplanationDepth; exampleDensity: ExampleDensity; additionalNotes: string }
 export type LearningTaskKind = 'lesson' | 'worked-example' | 'discussion' | 'exercise' | 'implementation'
 export type CompletionKind = 'short-answer' | 'reflection' | 'artifact'
@@ -27,4 +29,5 @@ export interface LearningEvent { id: string; stableId: string; type: string; sum
 export interface LearnLoopSettings { language: 'zh-CN' | 'en'; weeklyHours: number; strictness: 'supportive' | 'balanced' | 'strict'; autoMinorAdjustments: boolean; showModeExplanation: boolean; antiDependency: boolean }
 export interface LearningProject { id: string; title: string; goal: string; experience: string; weeklyHours: number; status: 'active' | 'archived'; createdAt: string; sessionId: string | null; learningPreferences: LearningPreferences }
 export interface LearnLoopState { schemaVersion: 2; revision: number; project: LearningProject | null; plans: PlanVersion[]; evidence: Evidence[]; mastery: MasteryState[]; assessments: Assessment[]; adjustments: AdjustmentProposal[]; events: LearningEvent[]; settings: LearnLoopSettings; misconceptions: string[]; reviewQueue: string[] }
+export interface LearnLoopProjection extends LearnLoopState { access: ProjectAccess; nextAction: LearningTask | null }
 export interface StateTable { get(id: string): LearnLoopState | undefined; put(id: string, value: LearnLoopState): Promise<void>; update(id: string, update: (current: LearnLoopState) => LearnLoopState): Promise<LearnLoopState> }
