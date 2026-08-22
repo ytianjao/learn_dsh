@@ -17,9 +17,9 @@ jobs:
       DSH_BIN: ${{ github.workspace }}/dsh-source/apps/cli/lib/bin.js
     steps:
       - name: Check out LearnLoop
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Check out pinned DeepSeek Harness source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: deepseek-ai/deepseek-harness
           ref: 141eb6fef83422698aef7a981029e843e8161534
@@ -28,7 +28,7 @@ jobs:
         with:
           version: 11.7.0
           run_install: false
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 22.19.0
           cache: pnpm
@@ -84,7 +84,7 @@ jobs:
           test ! -f mock-provider.pid || kill "$(cat mock-provider.pid)" 2>/dev/null || true
       - name: Upload browser reports, screenshots, traces, and logs
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: learnloop-web-e2e-${{ github.run_id }}
           if-no-files-found: warn
