@@ -27,3 +27,11 @@ DSH owns session, Chat, model routing, streaming, credentials, and the tool exec
 ## Unreleased — Runtime v2
 - Added explicit learning preferences, session ownership, v1 migration, dynamic System Prompt policy, preference-aware plan validation, and atomic start/complete progression gates.
 - Replaced visible internal control prompts and browser `prompt()` evidence with intent-only chat messages and an inline checkpoint.
+
+## Runtime hardening (PR #20)
+
+A LearnLoop project is bound to exactly one DSH Session. The Host returns a server-redacted projection to foreign sessions and rejects their project mutations; this local product-state isolation prevents accidental cross-session access, but is not multi-user or multi-tenant authentication. Same-origin remains the HTTP write boundary and LearnLoop never receives model credentials.
+
+Task status changes are available only through semantic commands: start, pause, resume, skip, safe restore, and atomic completion with evidence. A blocked task remains the current learning position; only completed or skipped dependencies are satisfied, and skipping never means mastery. Completing a task does not auto-start its successor.
+
+Invariants: `project.sessionId === mutation.sessionId`; active and blocked current tasks cannot coexist; `foreign => no project, plan, evidence, mastery, assessment, adjustment, or event content`.

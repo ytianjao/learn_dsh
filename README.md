@@ -111,3 +111,11 @@ DSH owns session, Chat, model routing, streaming, credentials, and the tool exec
 LearnLoop binds a project to the public DSH session ID. Other sessions receive no LearnLoop System Prompt and cannot publish that project's plan. Legacy v1 projects migrate without data loss and remain unbound until the user explicitly binds the current session.
 
 > Limitation: LearnLoop does not semantically filter arbitrary model prose. Domain transitions are deterministic; recurring model behavior is constrained by DSH System Prompt. Inline evidence currently uses `learnloop-inline-checkpoint` until real message references are integrated.
+
+## Runtime hardening (PR #20)
+
+A LearnLoop project is bound to exactly one DSH Session. The Host returns a server-redacted projection to foreign sessions and rejects their project mutations; this local product-state isolation prevents accidental cross-session access, but is not multi-user or multi-tenant authentication. Same-origin remains the HTTP write boundary and LearnLoop never receives model credentials.
+
+Task status changes are available only through semantic commands: start, pause, resume, skip, safe restore, and atomic completion with evidence. A blocked task remains the current learning position; only completed or skipped dependencies are satisfied, and skipping never means mastery. Completing a task does not auto-start its successor.
+
+Invariants: `project.sessionId === mutation.sessionId`; active and blocked current tasks cannot coexist; `foreign => no project, plan, evidence, mastery, assessment, adjustment, or event content`.
