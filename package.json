@@ -51,7 +51,8 @@
     "prepare": "pnpm run build",
     "test:evidence": "vitest run tests/evidence-bridge.spec.ts",
     "test:assessment": "vitest run tests/assessment-tool.spec.ts",
-    "test:prompt": "vitest run tests/prompt.spec.ts"
+    "test:prompt": "vitest run tests/prompt.spec.ts",
+    "test:runtime": "vitest run tests/assessment-tool.spec.ts tests/evidence-bridge.spec.ts tests/prompt.spec.ts"
   },
   "engines": {
     "node": "^22.19.0 || >=24"

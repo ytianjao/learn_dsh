@@ -1,0 +1,3 @@
+import {describe,it,expect} from 'vitest';import {extractTextAnswer,hashDirectMessages} from '../src/evidence-bridge.js'
+const message={id:'m1',role:'user' as const,source:{kind:'user' as const},content:[{type:'text' as const,text:'my answer'}]}
+describe('evidence bridge',()=>{it('captures only direct text with stable provenance',()=>{const answer=extractTextAnswer([message]);expect(answer?.answerText).toBe('my answer');expect(answer?.contentHash).toBe(hashDirectMessages([message]))});it('rejects unsupported content',()=>expect(()=>extractTextAnswer([{...message,content:[{type:'image',imageId:'x'}] as never}])).toThrow())})

@@ -1,36 +1,14 @@
 import { defineTool } from '@deepseek-ai/dsh-tools'
-import { nextAction, publishGeneratedPlan } from './domain.js'
+import { LearnLoopDomainError } from './domain.js'
+import { approveWorkspacePlan, beginWorkspaceOnboarding, commitWorkspaceProfile, publishWorkspacePlanDraft } from './workspace.js'
 import type { StateTable } from './types.js'
-
-const text = { type: 'string' as const, required: true as const }
-const key = { ...text, description: 'Stable lowercase key matching [a-z0-9][a-z0-9-]{0,63}; never a database ID.' }
-export function createLearnLoopPublishPlanTool(table: StateTable) {
-  return defineTool({
-    name: 'learnloop_publish_plan',
-    description: 'Publish the complete authoritative LearnLoop plan. The plan MUST obey the project learningPreferences and must never change the learner-selected mode or practice capacity. dependsOn references task keys. Never provide status, database IDs, plan version, revision, or timestamps.',
-    parameters: {
-      stages: { type: 'array', required: true, items: { type: 'object', additionalProperties: false, properties: {
-        key, title: text, tasks: { type: 'array', required: true, items: { type: 'object', additionalProperties: false, properties: {
-          key, title: text, objective: text, acceptanceCriteria: { type: 'array', required: true, items: { type: 'string' } }, estimateMinutes: { type: 'integer', required: true }, conceptKey: key, conceptTitle: text, dependsOn: { type: 'array', required: true, items: { type: 'string' } }, kind: { type: 'string', required: true, enum: ['lesson', 'worked-example', 'discussion', 'exercise', 'implementation'] }, completion: { type: 'object', required: true, additionalProperties: false, properties: { kind: { type: 'string', required: true, enum: ['short-answer', 'reflection', 'artifact'] }, prompt: text } },
-        } } },
-      } } },
-    },
-    output: {
-      schema: { type: 'object', additionalProperties: false, properties: {
-        status: { type: 'string', const: 'published', required: true }, revision: { type: 'integer', required: true }, planVersion: { type: 'integer', required: true }, stageCount: { type: 'integer', required: true }, taskCount: { type: 'integer', required: true }, firstTask: { type: 'object', required: true, additionalProperties: false, properties: { id: text, title: text, objective: text } },
-      } },
-      render: (_args, value) => [{ type: 'text', text: `Plan published at revision ${value.revision}. Begin teaching firstTask "${value.firstTask.title}" now and give the learner one clear next action.` }],
-    },
-    async execute(args, exec) {
-      if (!exec.agent) throw new Error('learnloop_publish_plan requires an agent execution')
-      if (exec.signal.aborted) throw exec.signal.reason
-      const updated = await table.update('singleton', state => {
-        return publishGeneratedPlan(state, { stages: args.stages, sessionId: exec.agent!.id, idempotencyKey: `learnloop-plan:${exec.callId}` })
-      })
-      if (exec.signal.aborted) throw exec.signal.reason
-      const plan = updated.plans.find(item => item.status === 'active')!
-      const firstTask = nextAction(updated)!
-      return { status: 'published' as const, revision: updated.revision, planVersion: plan.version, stageCount: plan.stages.length, taskCount: plan.stages.reduce((count, stage) => count + stage.tasks.length, 0), firstTask: { id: firstTask.id, title: firstTask.title, objective: firstTask.objective } }
-    },
-  })
+const text={type:'string' as const,required:true as const}, integer={type:'integer' as const,required:true as const}
+const key={...text,description:'Stable lowercase key; never a database id.'}
+export function createLearnLoopBeginOnboardingTool(table:StateTable){return defineTool({name:'learnloop_begin_onboarding',description:'Begin an explicitly requested guided interview in the supplied stable workspace; ask one native user question after this command.',parameters:{workspaceId:text,expectedRevision:integer,idempotencyKey:text},output:{schema:{type:'object',additionalProperties:false,properties:{status:{type:'string',const:'interviewing',required:true},projectId:text,revision:integer}},render:()=>[{type:'text',text:'Interview started. Ask exactly one core question with ask_user_question.'}]},async execute(args,exec){if(!exec.agent)throw new LearnLoopDomainError('SESSION_MISMATCH','Onboarding requires an agent execution.');const updated=await table.update('singleton',state=>beginWorkspaceOnboarding(state,{...args,sessionId:exec.agent!.id}));const workspace=updated.workspaces[args.workspaceId]!;return{status:'interviewing' as const,projectId:workspace.activeProjectId!,revision:workspace.revision}}})}
+export function createLearnLoopCommitProfileTool(table:StateTable){return defineTool({name:'learnloop_commit_profile',description:'Commit only learner-supported structured profile facts to the current stable workspace. This creates no active plan.',parameters:{workspaceId:text,projectId:text,expectedRevision:integer,idempotencyKey:text,goal:text,priorKnowledge:text,experienceLevel:{type:'string',required:true,enum:['beginner','intermediate','advanced']},knowledgeGaps:{type:'array',required:true,items:text},learningMode:{type:'string',required:true,enum:['knowledge-first','balanced','practice-first']},practiceCapacity:{type:'string',required:true,enum:['none','light','full']},weeklyHours:integer,deadline:{type:'string'},constraints:{type:'array',required:true,items:text},successCriteria:{type:'array',required:true,items:text},unansweredQuestions:{type:'array',required:true,items:text}},output:{schema:{type:'object',additionalProperties:false,properties:{status:{type:'string',const:'profile-review',required:true},revision:integer,profileRevision:integer}},render:(_a,v)=>[{type:'text',text:`Profile revision ${v.profileRevision} is awaiting explicit learner confirmation.`}]},async execute(args,exec){if(!exec.agent)throw new LearnLoopDomainError('SESSION_MISMATCH','Profile commit requires an agent execution.');const updated=await table.update('singleton',state=>commitWorkspaceProfile(state,args));const workspace=updated.workspaces[args.workspaceId]!;return{status:'profile-review' as const,revision:workspace.revision,profileRevision:workspace.profileRevision}}})}
+export function createLearnLoopPublishPlanTool(table:StateTable){
+  const task={type:'object' as const,additionalProperties:false,properties:{key,title:text,objective:text,acceptanceCriteria:{type:'array' as const,required:true as const,items:text},estimateMinutes:integer,conceptKey:key,conceptTitle:text,dependsOn:{type:'array' as const,required:true as const,items:text},kind:{type:'string' as const,required:true as const,enum:['lesson','worked-example','discussion','exercise','implementation']},completion:{type:'object' as const,required:true as const,additionalProperties:false,properties:{kind:{type:'string' as const,required:true as const,enum:['short-answer','reflection','artifact']},prompt:text}}}}
+  const stage={type:'object' as const,additionalProperties:false,properties:{key,title:text,tasks:{type:'array' as const,required:true as const,items:task}}}
+  return defineTool({name:'learnloop_publish_plan',description:'Publish a complete draft plan for an explicitly confirmed workspace profile. Host validates ownership, revisions, dependencies, DAG, bounds, and practice capacity. The learner must approve it separately.',parameters:{workspaceId:text,projectId:text,profileRevision:integer,expectedRevision:integer,idempotencyKey:text,stages:{type:'array',required:true,items:stage}},output:{schema:{type:'object',additionalProperties:false,properties:{status:{type:'string',const:'draft',required:true},revision:integer,planId:text,planVersion:integer}},render:(_a,v)=>[{type:'text',text:`Plan draft ${v.planVersion} awaits explicit learner approval; do not start teaching.`}]},async execute(args,exec){if(!exec.agent)throw new LearnLoopDomainError('SESSION_MISMATCH','Plan publication requires an agent execution.');const updated=await table.update('singleton',state=>publishWorkspacePlanDraft(state,args as unknown as Parameters<typeof publishWorkspacePlanDraft>[1]));const workspace=updated.workspaces[args.workspaceId]!,plan=workspace.plans.at(-1)!;return{status:'draft' as const,revision:workspace.revision,planId:plan.id,planVersion:plan.version}}})
 }
+export function createLearnLoopApprovePlanTool(table:StateTable){return defineTool({name:'learnloop_approve_plan',description:'Activate a draft only after the learner explicitly selected approve in the native question dialog.',parameters:{workspaceId:text,projectId:text,planId:text,expectedRevision:integer,idempotencyKey:text},output:{schema:{type:'object',additionalProperties:false,properties:{status:{type:'string',const:'active',required:true},revision:integer}},render:()=>[{type:'text',text:'The approved plan is active.'}]},async execute(args,exec){if(!exec.agent)throw new LearnLoopDomainError('SESSION_MISMATCH','Approval requires an agent execution.');const updated=await table.update('singleton',state=>approveWorkspacePlan(state,{...args,sessionId:exec.agent!.id}));return{status:'active' as const,revision:updated.workspaces[args.workspaceId]!.revision}}})}

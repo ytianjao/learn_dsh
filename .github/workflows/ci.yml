@@ -1,38 +1,60 @@
 name: CI
-
 on:
   pull_request:
   push:
     branches: [main, work]
-
 permissions:
   contents: read
-
+x-node: &node
+  uses: actions/setup-node@v5
+  with: {node-version: 22.19.0, cache: pnpm}
+x-pnpm: &pnpm
+  uses: pnpm/action-setup@v4
+  with: {version: 11.7.0, run_install: false}
 jobs:
-  keyless-checks:
+  build-typecheck:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 11.7.0
-          run_install: false
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22.19.0
-          cache: pnpm
-      - name: Install locked dependencies
-        run: pnpm install --frozen-lockfile
-      - name: Build
-        run: pnpm run build
-      - name: Typecheck
-        run: pnpm run typecheck
-      - name: Lint
-        run: pnpm run lint
-      - name: Unit tests
-        run: pnpm run test:unit
-      - name: Integration tests
-        run: pnpm run test:integration
-      - name: Validate package contents
-        run: pnpm run package:validate
+      - uses: actions/checkout@v5
+      - *pnpm
+      - *node
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run build
+      - run: pnpm run typecheck
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - *pnpm
+      - *node
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run lint
+  unit-domain:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - *pnpm
+      - *node
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run test:unit
+  unit-runtime-http-tool:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - *pnpm
+      - *node
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run test:integration
+      - run: pnpm run test:runtime
+      - run: pnpm run test:compat
+      - run: pnpm run test:prompt
+      - run: pnpm run test:health
+  full-suite:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - *pnpm
+      - *node
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run check
+      - run: pnpm run package:validate
