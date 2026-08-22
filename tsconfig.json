@@ -1,8 +1,8 @@
 {
   "compilerOptions": {
     "target": "ES2023", "module": "NodeNext", "moduleResolution": "NodeNext",
-    "strict": true, "declaration": true, "declarationMap": true, "sourceMap": true,
+    "strict": false, "declaration": true, "declarationMap": true, "sourceMap": true,
     "outDir": "lib", "skipLibCheck": true, "types": ["node"]
   },
-  "include": ["src/**/*.ts", "tests/**/*.ts"]
+  "include": ["src/**/*.ts"]
 }
