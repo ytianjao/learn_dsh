@@ -71,3 +71,13 @@ A LearnLoop project is bound to exactly one DSH Session. The Host returns a serv
 Task status changes are available only through semantic commands: start, pause, resume, skip, safe restore, and atomic completion with evidence. A blocked task remains the current learning position; only completed or skipped dependencies are satisfied, and skipping never means mastery. Completing a task does not auto-start its successor.
 
 Invariants: `project.sessionId === mutation.sessionId`; active and blocked current tasks cannot coexist; `foreign => no project, plan, evidence, mastery, assessment, adjustment, or event content`.
+
+## Verified answer invariants
+- **Candidate provenance:** every `candidate.source.messageIds` identifies a real DSH `user/message` in `project.sessionId`.
+- **Assessment:** every acceptance criterion has exactly one criterion result.
+- **Completion:** `task.status === completed` implies a verified assessment result of `passed` or `excellent`.
+- **Visibility:** the answer appears as an ordinary Chat user message; verifier policy appears only in System Prompt/trajectory.
+- **Mastery:** one passed answer produces at most `demonstrated`; `mastered` requires future cross-time review.
+- **Backup:** only the owner Session can export a complete project backup.
+
+Verified Answer Loop v1 accepts text only. It does not automatically verify images or artifacts, implement mastered retention, or rewrite arbitrary model prose. Model judgment can still be wrong; the host nevertheless enforces provenance, complete criterion coverage, and state boundaries.

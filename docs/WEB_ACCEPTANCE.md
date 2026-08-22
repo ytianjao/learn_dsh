@@ -45,3 +45,6 @@ A LearnLoop project is bound to exactly one DSH Session. The Host returns a serv
 Task status changes are available only through semantic commands: start, pause, resume, skip, safe restore, and atomic completion with evidence. A blocked task remains the current learning position; only completed or skipped dependencies are satisfied, and skipping never means mastery. Completing a task does not auto-start its successor.
 
 Invariants: `project.sessionId === mutation.sessionId`; active and blocked current tasks cannot coexist; `foreign => no project, plan, evidence, mastery, assessment, adjustment, or event content`.
+
+## Browser trust boundary
+The web client may call only begin/cancel check for verification. It never sends confidence, message identifiers, event sequence, criterion result, or task completion. Owner export uses the dedicated export endpoint; settings-only and foreign views cannot download a project.

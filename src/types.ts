@@ -1,33 +1,43 @@
-/** LearnLoop persisted vocabulary. */
-export type TaskState = 'pending' | 'active' | 'blocked' | 'completed' | 'skipped'
-export type MasteryLevel = 'unassessed' | 'introduced' | 'practicing' | 'demonstrated' | 'mastered'
-export type AdjustmentState = 'proposed' | 'applied' | 'rejected' | 'reverted'
-export type LearningMode = 'knowledge-first' | 'balanced' | 'practice-first'
-export type PracticeCapacity = 'none' | 'light' | 'full'
-export type ExplanationDepth = 'standard' | 'deep'
-export type ExampleDensity = 'standard' | 'high'
-export type ProjectAccess = 'none' | 'owner' | 'foreign' | 'unbound' | 'settings-only'
-export type LearnLoopErrorCode = 'PROJECT_NOT_FOUND' | 'PROJECT_ALREADY_EXISTS' | 'PROJECT_UNBOUND' | 'SESSION_MISMATCH' | 'PLAN_NOT_PUBLISHED' | 'TASK_NOT_FOUND' | 'TASK_LOCKED' | 'INVALID_TASK_TRANSITION' | 'EVIDENCE_MISMATCH' | 'ADJUSTMENT_NOT_FOUND' | 'INVALID_ADJUSTMENT'
-export interface LearningPreferences { mode: LearningMode; practiceCapacity: PracticeCapacity; explanationDepth: ExplanationDepth; exampleDensity: ExampleDensity; additionalNotes: string }
-export type LearningTaskKind = 'lesson' | 'worked-example' | 'discussion' | 'exercise' | 'implementation'
-export type CompletionKind = 'short-answer' | 'reflection' | 'artifact'
-export interface CompletionRequirement { kind: CompletionKind; prompt: string }
-export interface LearningTask { id: string; title: string; objective: string; acceptanceCriteria: string[]; estimateMinutes: number; status: TaskState; conceptIds: string[]; dependsOn: string[]; kind: LearningTaskKind; completion: CompletionRequirement }
-export interface Stage { id: string; title: string; tasks: LearningTask[] }
-export interface GeneratedPlanTaskInput { key: string; title: string; objective: string; acceptanceCriteria: string[]; estimateMinutes: number; conceptKey: string; conceptTitle: string; dependsOn: string[]; kind: LearningTaskKind; completion: CompletionRequirement }
-export interface GeneratedPlanStageInput { key: string; title: string; tasks: GeneratedPlanTaskInput[] }
-export interface GeneratedPlanInput { stages: GeneratedPlanStageInput[] }
-export interface PlanVersion { id: string; version: number; status: 'draft' | 'active' | 'superseded' | 'archived'; createdAt: string; stages: Stage[] }
-export interface Evidence { id: string; idempotencyKey: string; conceptId: string; kind: 'explanation' | 'pseudocode' | 'implementation' | 'hypothesis' | 'assessment' | 'reflection'; summary: string; source: { sessionId: string; messageRange: string }; confidence: number; createdAt: string }
-export interface MasteryState { conceptId: string; title: string; level: MasteryLevel; evidenceIds: string[]; rationale: string; updatedAt: string }
-export interface Assessment { id: string; conceptId: string; result: 'needs-work' | 'passed' | 'excellent'; explanation: string; evidenceId: string; createdAt: string }
-export type PlanOperation =
-  | { type: 'update-task'; taskId: string; patch: Partial<Pick<LearningTask, 'title' | 'objective' | 'acceptanceCriteria' | 'estimateMinutes' | 'status'>> }
-  | { type: 'move-task'; taskId: string; toStageId: string; beforeTaskId?: string }
-export interface AdjustmentProposal { id: string; idempotencyKey: string; impact: 'minor' | 'major'; state: AdjustmentState; reason: string; diff: string[]; operations: PlanOperation[]; inverseOperations?: PlanOperation[]; createdAt: string; appliedPlanVersion?: number; revertedPlanVersion?: number }
-export interface LearningEvent { id: string; stableId: string; type: string; summary: string; createdAt: string }
-export interface LearnLoopSettings { language: 'zh-CN' | 'en'; weeklyHours: number; strictness: 'supportive' | 'balanced' | 'strict'; autoMinorAdjustments: boolean; showModeExplanation: boolean; antiDependency: boolean }
-export interface LearningProject { id: string; title: string; goal: string; experience: string; weeklyHours: number; status: 'active' | 'archived'; createdAt: string; sessionId: string | null; learningPreferences: LearningPreferences }
-export interface LearnLoopState { schemaVersion: 2; revision: number; project: LearningProject | null; plans: PlanVersion[]; evidence: Evidence[]; mastery: MasteryState[]; assessments: Assessment[]; adjustments: AdjustmentProposal[]; events: LearningEvent[]; settings: LearnLoopSettings; misconceptions: string[]; reviewQueue: string[] }
-export interface LearnLoopProjection extends LearnLoopState { access: ProjectAccess; nextAction: LearningTask | null }
-export interface StateTable { get(id: string): LearnLoopState | undefined; put(id: string, value: LearnLoopState): Promise<void>; update(id: string, update: (current: LearnLoopState) => LearnLoopState): Promise<LearnLoopState> }
+/** LearnLoop persisted vocabulary (state schema v3; storage unit remains v1). */
+export type TaskState='pending'|'active'|'blocked'|'completed'|'skipped'
+export type MasteryLevel='unassessed'|'introduced'|'practicing'|'demonstrated'|'mastered'
+export type AdjustmentState='proposed'|'applied'|'rejected'|'reverted'
+export type LearningMode='knowledge-first'|'balanced'|'practice-first'
+export type PracticeCapacity='none'|'light'|'full'
+export type ExplanationDepth='standard'|'deep'
+export type ExampleDensity='standard'|'high'
+export type ProjectAccess='none'|'owner'|'foreign'|'unbound'|'settings-only'
+export type LearnLoopErrorCode='PROJECT_NOT_FOUND'|'PROJECT_ALREADY_EXISTS'|'PROJECT_UNBOUND'|'SESSION_MISMATCH'|'SESSION_NOT_LIVE'|'PLAN_NOT_PUBLISHED'|'PLAN_ALREADY_PUBLISHED'|'INVALID_PLAN'|'TASK_NOT_FOUND'|'TASK_LOCKED'|'INVALID_TASK_TRANSITION'|'CHECK_NOT_ARMED'|'CHECK_ALREADY_ARMED'|'ANSWER_UNSUPPORTED'|'CANDIDATE_NOT_FOUND'|'CANDIDATE_NOT_READY'|'CANDIDATE_SOURCE_MISSING'|'ASSESSMENT_INVALID'|'EVIDENCE_MISMATCH'|'ADJUSTMENT_NOT_FOUND'|'INVALID_ADJUSTMENT'|'IDEMPOTENCY_KEY_REUSED'|'EXPORT_FORBIDDEN'|'REVISION_CONFLICT'
+export interface LearningPreferences{mode:LearningMode;practiceCapacity:PracticeCapacity;explanationDepth:ExplanationDepth;exampleDensity:ExampleDensity;additionalNotes:string}
+export type LearningTaskKind='lesson'|'worked-example'|'discussion'|'exercise'|'implementation'
+export type CompletionKind='short-answer'|'reflection'|'artifact'
+export interface CompletionRequirement{kind:CompletionKind;prompt:string}
+export interface LearningTask{id:string;title:string;objective:string;acceptanceCriteria:string[];estimateMinutes:number;status:TaskState;conceptIds:string[];dependsOn:string[];kind:LearningTaskKind;completion:CompletionRequirement}
+export interface Stage{id:string;title:string;tasks:LearningTask[]}
+export interface GeneratedPlanTaskInput{key:string;title:string;objective:string;acceptanceCriteria:string[];estimateMinutes:number;conceptKey:string;conceptTitle:string;dependsOn:string[];kind:LearningTaskKind;completion:CompletionRequirement}
+export interface GeneratedPlanStageInput{key:string;title:string;tasks:GeneratedPlanTaskInput[]}
+export interface GeneratedPlanInput{stages:GeneratedPlanStageInput[]}
+export interface PlanVersion{id:string;version:number;status:'draft'|'active'|'superseded'|'archived';createdAt:string;stages:Stage[]}
+export type EvidenceKind='explanation'|'pseudocode'|'implementation'|'hypothesis'|'assessment'|'reflection'
+export interface LegacyEvidence{provenance:'legacy';id:string;idempotencyKey:string;conceptId:string;kind:EvidenceKind;summary:string;source:{kind:'legacy';sessionId:string;messageRange:string};confidence:number;createdAt:string}
+export interface VerifiedEvidence{provenance:'verified';id:string;idempotencyKey:string;conceptId:string;kind:EvidenceKind;summary:string;assessmentId:string;source:{kind:'dsh-message';sessionId:string;messageIds:string[];eventSeqs:number[];contentHash:string};createdAt:string}
+export type Evidence=LegacyEvidence|VerifiedEvidence
+export interface MasteryState{conceptId:string;title:string;level:MasteryLevel;evidenceIds:string[];rationale:string;updatedAt:string}
+export interface LegacyAssessment{kind:'legacy';id:string;conceptId:string;result:'needs-work'|'passed'|'excellent';explanation:string;evidenceId:string;createdAt:string}
+export type CriterionResult='passed'|'partial'|'failed'
+export interface CriterionAssessment{criterionIndex:number;result:CriterionResult;explanation:string}
+export interface VerifiedTaskAssessment{kind:'verified-task';id:string;candidateId:string;taskId:string;conceptId:string;result:'needs-work'|'passed'|'excellent';criteria:CriterionAssessment[];misconceptions:string[];feedback:string;verifier:{provider:string;model:string;requestEventSeq:number;toolCallId:string;policyVersion:'learnloop-verifier-v1';rubricVersion:'learnloop-rubric-v1'};createdAt:string}
+export type Assessment=LegacyAssessment|VerifiedTaskAssessment
+export type EvidenceCandidateStatus='pending-verification'|'needs-work'|'accepted'|'cancelled'
+export interface EvidenceCandidate{id:string;taskId:string;conceptId:string;source:{sessionId:string;messageIds:string[];eventSeqs:number[];contentHash:string};answerText:string;status:EvidenceCandidateStatus;attempt:number;assessmentId:string|null;createdAt:string;updatedAt:string}
+export type LearningExecutionPhase='teaching'|'awaiting-answer'|'verifying'|'needs-revision'|'passed'|'paused'
+export interface LearningExecution{taskId:string;phase:LearningExecutionPhase;attempt:number;armedAfterSeq:number|null;candidateId:string|null;lastAssessmentId:string|null;updatedAt:string}
+export interface CommandReceipt{idempotencyKey:string;action:string;sessionId:string|null;payloadHash:string;resultRevision:number;createdAt:string}
+export type PlanOperation={type:'update-task';taskId:string;patch:Partial<Pick<LearningTask,'title'|'objective'|'acceptanceCriteria'|'estimateMinutes'|'status'>>}|{type:'move-task';taskId:string;toStageId:string;beforeTaskId?:string}
+export interface AdjustmentProposal{id:string;idempotencyKey:string;impact:'minor'|'major';state:AdjustmentState;reason:string;diff:string[];operations:PlanOperation[];inverseOperations?:PlanOperation[];createdAt:string;appliedPlanVersion?:number;revertedPlanVersion?:number}
+export interface LearningEvent{id:string;stableId:string;type:string;summary:string;createdAt:string}
+export interface LearnLoopSettings{language:'zh-CN'|'en';weeklyHours:number;strictness:'supportive'|'balanced'|'strict';autoMinorAdjustments:boolean;showModeExplanation:boolean;antiDependency:boolean}
+export interface LearningProject{id:string;title:string;goal:string;experience:string;weeklyHours:number;status:'active'|'archived';createdAt:string;sessionId:string|null;learningPreferences:LearningPreferences}
+export interface LearnLoopState{schemaVersion:3;revision:number;project:LearningProject|null;plans:PlanVersion[];evidence:Evidence[];mastery:MasteryState[];assessments:Assessment[];adjustments:AdjustmentProposal[];events:LearningEvent[];settings:LearnLoopSettings;misconceptions:string[];reviewQueue:string[];execution:LearningExecution|null;evidenceCandidates:EvidenceCandidate[];commandReceipts:CommandReceipt[]}
+export interface LearnLoopProjection extends LearnLoopState{access:ProjectAccess;nextAction:LearningTask|null}
+export interface StateTable{get(id:string):LearnLoopState|undefined;put(id:string,value:LearnLoopState):Promise<void>;update(id:string,update:(current:LearnLoopState)=>LearnLoopState):Promise<LearnLoopState>}
