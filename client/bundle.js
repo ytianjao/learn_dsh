@@ -1,54 +1,67 @@
-/* Prebuilt DSH Web client module. This script is loaded directly by the
- * browser, so it must register itself instead of relying on CommonJS globals. */
+/* Prebuilt DSH Web client module. Keep this file dependency-free: DSH loads it directly. */
 window.__ModuleLoader__.load({
   id: '@learnloop/dsh-learnloop',
   factory: function (require) {
     const module = { exports: {} }
     module.exports = function () {
-  const React = require('react')
-  const stores = new Map()
-  const manager = { open: false, listeners: new Set() }
-  function storeFor(workspaceId) {
-    const key = workspaceId || '__manager__'
-    if (!stores.has(key)) stores.set(key, { workspaceId, value: null, loading: false })
-    return stores.get(key)
-  }
-  async function load(workspaceId) {
-    const store = storeFor(workspaceId)
-    if (!workspaceId) return store
-    store.loading = true
-    const response = await fetch('/learnloop/api/v2/state?workspaceId=' + encodeURIComponent(workspaceId))
-    if (!response.ok) throw new Error('LearnLoop state request failed')
-    store.value = await response.json(); store.loading = false
-    return store
-  }
-  function useWorkspace(props) {
-    const workspaceId = props.workspaceId
-    const [, redraw] = React.useReducer(x => x + 1, 0)
-    React.useEffect(() => { let active = true; load(workspaceId).then(() => active && redraw()); return () => { active = false } }, [workspaceId])
-    return storeFor(workspaceId)
-  }
-  function Launcher(props) {
-    const store = useWorkspace(props), project = store.value && store.value.activeProject
-    return React.createElement('button', { onClick: () => props.inputActions && props.inputActions.submit && (props.inputActions.setDraft('我想主动开启 LearnLoop 学习模式。请调用 learnloop_begin_onboarding，然后使用 ask_user_question 逐步访谈。'), props.inputActions.submit()) }, project ? '继续学习' : '开启学习模式')
-  }
-  function WorkspaceView(props) {
-    const store = useWorkspace(props), value = store.value
-    if (!value) return React.createElement('div', null, '正在同步 LearnLoop…')
-    const project = value.activeProject
-    return React.createElement('main', null, React.createElement('h2', null, project ? project.title : '还没有学习项目'), project && React.createElement('p', null, project.profile ? project.profile.goal : '正在建立学习档案'), project && React.createElement('p', null, '阶段：' + project.phase))
-  }
-  function ManagerAction() { return React.createElement('button', { onClick: () => { manager.open = true; manager.listeners.forEach(fn => fn()) } }, '学习计划') }
-  function ManagerView(props) { const [, redraw] = React.useReducer(x => x + 1, 0); React.useEffect(() => { manager.listeners.add(redraw); return () => manager.listeners.delete(redraw) }, []); return manager.open ? React.createElement(WorkspaceView, props) : null }
-  const inject = ['slots']
-  function apply(ctx) {
-    const slots = ctx.get('slots'); if (!slots) return
-    slots.inject('conversation.input.left', () => slots.register({ name: 'conversation.input.left', id: 'learnloop-launcher', order: -10 }, Launcher))
-    slots.inject('conversation.view', () => slots.register({ name: 'conversation.view', id: 'learnloop-manager', order: 20, label: '学习计划 / Learning Plan' }, ManagerView))
-    slots.inject('sidebar.footer.action', () => slots.register({ name: 'sidebar.footer.action', id: 'learnloop-plans', order: 20, label: '学习计划' }, ManagerAction))
-    slots.inject('settings.section', () => slots.register({ name: 'settings.section', id: 'learnloop', order: 25, label: 'LearnLoop' }, () => React.createElement('p', null, 'LearnLoop v0.2.0')))
-  }
-      return { inject, apply }
+      const React = require('react')
+      const e = React.createElement
+      const API = '/learnloop/api/v2/state'
+      const MANAGE = '/learnloop/api/v2/manage'
+      const VERSION = '0.2.0'
+      const CSS = '.ll-page{padding:22px;overflow:auto;height:100%;box-sizing:border-box}.ll-shell{max-width:960px;margin:auto;display:grid;gap:14px}.ll-nav,.ll-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.ll-card{border:1px solid color-mix(in srgb,currentColor 14%,transparent);border-radius:12px;padding:16px}.ll-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.ll-task{border-top:1px solid color-mix(in srgb,currentColor 10%,transparent);padding:9px 0}.ll-small{opacity:.65;font-size:12px}.ll-btn{font:inherit;font-size:12px;border:1px solid color-mix(in srgb,currentColor 20%,transparent);border-radius:8px;padding:6px 10px;background:transparent;color:inherit;cursor:pointer}.ll-error{color:#dc2626}.ll-field{display:grid;gap:5px;font-size:12px}.ll-input{font:inherit;padding:7px;border:1px solid color-mix(in srgb,currentColor 20%,transparent);border-radius:7px;background:transparent;color:inherit}.ll-toggle{display:flex;justify-content:space-between}.ll-loading,.ll-empty{text-align:center;padding:40px}.ll-badge{font-size:11px;padding:3px 8px;border-radius:99px;background:#16a34a22;color:#16a34a}@media(max-width:700px){.ll-grid{grid-template-columns:1fr}}'
+      const stores = new Map()
+      function workspaceIdForSession(sessionId, workspaces) {
+        if (!sessionId) return null
+        const found = (workspaces || []).find(function (workspace) { return (workspace.sessionIds || []).includes(sessionId) })
+        return found ? found.workspaceId : null
+      }
+      function createStore(workspaceId) { return { workspaceId: workspaceId, status: workspaceId ? 'loading' : 'empty/no-workspace', value: null, error: null, request: 0, listeners: new Set() } }
+      function storeFor(workspaceId) { const key = workspaceId || '__no-workspace__'; if (!stores.has(key)) stores.set(key, createStore(workspaceId)); return stores.get(key) }
+      function notify(store) { store.listeners.forEach(function (listener) { listener() }) }
+      async function load(workspaceId) {
+        const store = storeFor(workspaceId)
+        if (!workspaceId) { store.status = 'empty/no-workspace'; store.value = null; store.error = null; notify(store); return store }
+        const request = ++store.request
+        store.status = 'loading'; store.error = null; notify(store)
+        try {
+          const response = await fetch(API + '?workspaceId=' + encodeURIComponent(workspaceId), { cache: 'no-store' })
+          if (!response.ok) { const payload = await response.json().catch(function () { return null }); throw new Error(payload && payload.error ? payload.error.message : 'HTTP ' + response.status) }
+          const value = await response.json()
+          if (request === store.request) { store.value = value; store.status = value.activeProject ? 'ready' : 'empty/no-workspace'; notify(store) }
+        } catch (error) {
+          if (request === store.request) { store.error = String(error && error.message || error); store.status = 'error'; notify(store) }
+        }
+        return store
+      }
+      function useWorkspace(props) {
+        const workspaces = props.useWorkspaces(function (state) { return state.items })
+        const workspaceId = workspaceIdForSession(props.sessionId, workspaces)
+        const store = storeFor(workspaceId)
+        const redraw = React.useReducer(function (x) { return x + 1 }, 0)[1]
+        React.useEffect(function () { store.status = workspaceId ? 'resolving-workspace' : 'empty/no-workspace'; const listener = function () { redraw() }; store.listeners.add(listener); load(workspaceId); return function () { store.listeners.delete(listener) } }, [workspaceId, store])
+        return store
+      }
+      function Status(props) {
+        const store = props.store
+        if (store.status === 'resolving-workspace' || store.status === 'loading') return e('div', { className: 'll-loading' }, '正在同步 LearnLoop… / Syncing LearnLoop…')
+        if (store.status === 'error') return e('div', { className: 'll-page' }, e('div', { className: 'll-card ll-error', role: 'alert' }, '无法连接 LearnLoop / Cannot connect to LearnLoop: ' + store.error, e('div', null, e('button', { className: 'll-btn', onClick: function () { load(store.workspaceId) } }, '重试 / Retry'))))
+        if (!store.workspaceId) return e('div', { className: 'll-empty' }, e('h2', null, '未找到 Workspace / No Workspace'), e('p', { className: 'll-small' }, '当前 Session 尚未归属 Workspace，请先在侧栏选择 Workspace。 / Select a Workspace for this Session first.'))
+        return props.children(store.value)
+      }
+      function Header(title, project) { return e('header', null, e('h2', null, title), project && e('div', { className: 'll-row' }, e('span', null, project.title), e('span', { className: 'll-badge' }, project.phase))) }
+      function Plan(props) { const store = useWorkspace(props); return e(Status, { store: store }, function (value) { const project = value.activeProject; if (!project) return e('div', { className: 'll-empty' }, e('h2', null, '还没有学习项目 / No learning project yet'), e('p', null, '在对话输入区开启学习模式。 / Start learning from the chat composer.')); const plan = project.plans.find(function (item) { return item.id === project.activePlanId }) || project.plans.slice(-1)[0]; return e('main', { className: 'll-page' }, e('div', { className: 'll-shell' }, Header('学习计划 / Learning Plan', project), !plan ? e('section', { className: 'll-card' }, e('h3', null, '正在等待学习计划 / Waiting for a learning plan'), e('p', { className: 'll-small' }, '计划尚未由 DSH 模型发布。 / The DSH model has not published a plan yet.')) : plan.stages.map(function (stage) { return e('section', { className: 'll-card', key: stage.id }, e('h3', null, stage.title), stage.tasks.map(function (task) { return e('article', { className: 'll-task', key: task.id }, e('strong', null, task.title), e('div', { className: 'll-small' }, task.objective + ' · ' + task.estimateMinutes + ' min · ' + task.status)) })) }))) }) }
+      function Progress(props) { const store = useWorkspace(props); return e(Status, { store: store }, function (value) { const p = value.activeProject; if (!p) return e('div', { className: 'll-empty' }, '暂无进度 / No progress yet'); const plan = p.plans.find(function (x) { return x.id === p.activePlanId }); const completed = plan ? plan.stages.flatMap(function (s) { return s.tasks }).filter(function (t) { return t.status === 'completed' }) : []; return e('main', { className: 'll-page' }, e('div', { className: 'll-shell' }, Header('学习进度 / Progress', p), e('div', { className: 'll-grid' }, e('section', { className: 'll-card' }, e('h3', null, '已完成任务 / Completed tasks'), completed.length ? completed.map(function (t) { return e('div', { className: 'll-task', key: t.id }, t.title) }) : e('p', { className: 'll-small' }, '尚无已完成任务。 / None yet.')), e('section', { className: 'll-card' }, e('h3', null, '掌握度 / Mastery'), p.mastery.length ? p.mastery.map(function (m) { return e('div', { className: 'll-task', key: m.conceptId }, e('strong', null, m.title), e('div', { className: 'll-small' }, m.level + ' · ' + m.rationale)) }) : e('p', { className: 'll-small' }, '尚无掌握度记录。 / No mastery record.'))), e('section', { className: 'll-card' }, e('h3', null, '证据 / Evidence'), p.evidence.length ? p.evidence.slice().reverse().map(function (item) { return e('div', { className: 'll-task', key: item.id }, item.summary) }) : e('p', { className: 'll-small' }, '尚无可追溯证据。 / No traceable evidence.')))) }) }
+      function Review(props) { const store = useWorkspace(props); return e(Status, { store: store }, function (value) { const p = value.activeProject; if (!p) return e('div', { className: 'll-empty' }, '暂无复盘 / No review yet'); const recent = p.evidence.slice(-5).reverse(); return e('main', { className: 'll-page' }, e('div', { className: 'll-shell' }, Header('复盘 / Review', p), e('div', { className: 'll-grid' }, e('section', { className: 'll-card' }, e('h3', null, '误区 / Misconceptions'), p.misconceptions.length ? p.misconceptions.map(function (x) { return e('div', { className: 'll-task', key: x }, x) }) : e('p', { className: 'll-small' }, '尚未记录误区。 / No misconceptions recorded.')), e('section', { className: 'll-card' }, e('h3', null, '近期证据 / Recent evidence'), recent.length ? recent.map(function (x) { return e('div', { className: 'll-task', key: x.id }, x.summary) }) : e('p', { className: 'll-small' }, '尚无证据。 / No evidence yet.'))), e('section', { className: 'll-card' }, e('h3', null, '下一步 / Next step'), e('p', null, value.nextAction ? value.nextAction.title : (p.reviewQueue[0] || '当前没有待办复盘。 / Nothing queued.'))))) }) }
+      function Launcher(props) { const store = useWorkspace(props); const project = store.value && store.value.activeProject; return e('button', { className: 'll-btn', onClick: function () { if (props.inputActions && props.inputActions.submit) { props.inputActions.setDraft('我想主动开启 LearnLoop 学习模式。请调用 learnloop_begin_onboarding，然后使用 ask_user_question 逐步访谈。'); props.inputActions.submit() } } }, project ? '继续学习' : '开启学习模式') }
+      // rc.8 gives this root-scoped slot read-only global hooks but no public view action; click its registered tab as the narrow compatibility boundary.
+      function openLearnLoopView() { const tab = Array.from(document.querySelectorAll('[role="tab"]')).find(function (item) { return /学习计划|Learning Plan/.test(item.textContent || '') }); if (tab) { tab.click(); return true } return false }
+      function ManagerAction(props) { const current = props.useSessions(function (state) { return state.current }); const workspaces = props.useWorkspaces(function (state) { return state.items }); const workspaceId = workspaceIdForSession(current, workspaces); const notice = React.useState(''); return e('div', null, e('button', { className: 'll-btn', onClick: function () { if (!current) return notice[1]('请先选择 Session / Select a Session first.'); if (!workspaceId) return notice[1]('当前 Session 没有 Workspace / This Session has no Workspace.'); if (!openLearnLoopView()) notice[1]('LearnLoop 视图暂不可用 / LearnLoop view is unavailable.') } }, '学习计划'), notice[0] && e('div', { role: 'status', className: 'll-small' }, notice[0])) }
+      function useManagement() { const state = React.useState({ status: 'loading', value: null, error: null }); const refresh = function () { state[1]({ status: 'loading', value: null, error: null }); fetch(MANAGE, { cache: 'no-store' }).then(function (r) { if (!r.ok) throw Error('HTTP ' + r.status); return r.json() }).then(function (v) { state[1]({ status: 'ready', value: v, error: null }) }).catch(function (x) { state[1]({ status: 'error', value: null, error: String(x.message || x) }) }) }; React.useEffect(refresh, []); return [state[0], refresh, state[1]] }
+      function Settings() { const management = useManagement(), state = management[0]; if (state.status === 'loading') return e('div', { className: 'll-loading' }, '正在加载 LearnLoop 设置… / Loading LearnLoop settings…'); if (state.status === 'error') return e('div', { className: 'll-error', role: 'alert' }, state.error, e('button', { className: 'll-btn', onClick: management[1] }, '重试 / Retry')); const value = state.value, settings = value.settings; function save(patch) { const next = Object.assign({}, settings, patch); fetch(MANAGE, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'update-settings', expectedRootRevision: value.rootRevision, settings: next }) }).then(function (r) { return r.json().then(function (v) { if (!r.ok) throw Error(v.error && v.error.message || 'HTTP ' + r.status); return v }) }).then(function (v) { management[2]({ status: 'ready', value: v, error: null }) }).catch(function (x) { management[2]({ status: 'error', value: null, error: String(x.message || x) }) }) } function field(label, input) { return e('label', { className: 'll-field' }, label, input) } return e('div', { className: 'll-shell' }, e('h3', null, 'LearnLoop 设置 / Settings'), e('section', { className: 'll-card' }, e('h3', null, '已保存的学习计划 / Saved learning plans'), value.workspaces.length ? value.workspaces.map(function (w) { return e('div', { className: 'll-task', key: w.workspaceId }, e('strong', null, w.workspaceDisplayName || w.workspaceId), w.projects.map(function (p) { return e('div', { className: 'll-small', key: p.id }, p.title + ' · ' + p.phase) }), e('a', { className: 'll-btn', href: '/learnloop/api/v2/export?workspaceId=' + encodeURIComponent(w.workspaceId), download: true }, '导出 Workspace / Export')) }) : e('p', { className: 'll-small' }, '暂无 Workspace 或 Project。 / No Workspace or Project.')), e('section', { className: 'll-card ll-grid' }, field('language', e('select', { className: 'll-input', value: settings.language, onChange: function (x) { save({ language: x.target.value }) } }, e('option', { value: 'zh-CN' }, '简体中文'), e('option', { value: 'en' }, 'English'))), field('weeklyHours', e('input', { className: 'll-input', type: 'number', min: 1, max: 80, value: settings.weeklyHours, onChange: function (x) { save({ weeklyHours: Number(x.target.value) }) } })), field('strictness', e('select', { className: 'll-input', value: settings.strictness, onChange: function (x) { save({ strictness: x.target.value }) } }, ['supportive', 'balanced', 'strict'].map(function (x) { return e('option', { key: x, value: x }, x) }))), ['autoMinorAdjustments', 'showModeExplanation', 'antiDependency'].map(function (key) { return e('label', { className: 'll-toggle', key: key }, key, e('input', { type: 'checkbox', checked: settings[key], onChange: function (x) { const patch = {}; patch[key] = x.target.checked; save(patch) } })) })), e('div', { className: 'll-small' }, 'Plugin version: v' + VERSION)) }
+      const inject = ['slots']
+      function apply(ctx) { const slots = ctx.get('slots'); if (!slots) return; if (typeof document !== 'undefined') { const style = document.createElement('style'); style.dataset.plugin = 'learnloop'; style.textContent = CSS; document.head.append(style); if (ctx.effect) ctx.effect(function () { return function () { style.remove() } }) } slots.inject('conversation.input.left', function () { return slots.register({ name: 'conversation.input.left', id: 'learnloop-launcher', order: -10 }, Launcher) }); slots.inject('conversation.view', function () { return slots.register({ name: 'conversation.view', id: 'learnloop-plan', order: 20, label: '学习计划 / Learning Plan' }, Plan) }); slots.inject('conversation.view', function () { return slots.register({ name: 'conversation.view', id: 'learnloop-progress', order: 21, label: '学习进度 / Progress' }, Progress) }); slots.inject('conversation.view', function () { return slots.register({ name: 'conversation.view', id: 'learnloop-review', order: 22, label: '复盘 / Review' }, Review) }); slots.inject('sidebar.footer.action', function () { return slots.register({ name: 'sidebar.footer.action', id: 'learnloop-plans', order: 20, label: '学习计划' }, ManagerAction) }); slots.inject('settings.section', function () { return slots.register({ name: 'settings.section', id: 'learnloop', order: 25, label: 'LearnLoop' }, Settings) }) }
+      return { inject: inject, apply: apply, __test: { workspaceIdForSession: workspaceIdForSession, storeFor: storeFor, load: load, openLearnLoopView: openLearnLoopView } }
     }()
     return module.exports
   }
