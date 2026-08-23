@@ -1,4 +1,10 @@
-module.exports = function () {
+/* Prebuilt DSH Web client module. This script is loaded directly by the
+ * browser, so it must register itself instead of relying on CommonJS globals. */
+window.__ModuleLoader__.load({
+  id: '@learnloop/dsh-learnloop',
+  factory: function (require) {
+    const module = { exports: {} }
+    module.exports = function () {
   const React = require('react')
   const stores = new Map()
   const manager = { open: false, listeners: new Set() }
@@ -42,5 +48,8 @@ module.exports = function () {
     slots.inject('sidebar.footer.action', () => slots.register({ name: 'sidebar.footer.action', id: 'learnloop-plans', order: 20, label: '学习计划' }, ManagerAction))
     slots.inject('settings.section', () => slots.register({ name: 'settings.section', id: 'learnloop', order: 25, label: 'LearnLoop' }, () => React.createElement('p', null, 'LearnLoop v0.2.0')))
   }
-  return { inject, apply }
-}()
+      return { inject, apply }
+    }()
+    return module.exports
+  }
+})
