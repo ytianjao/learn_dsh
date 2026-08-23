@@ -1,6 +1,11 @@
 # 变更日志 / Changelog
 
-## Unreleased
+## 0.2.0
+
+- Breaking: removed support for pre-canonical LearnLoop persisted states and backup format 1.
+- Canonical schema 5 stores all learning data inside Workspace Project aggregates; storage unit 2 and HTTP API v2 establish the new epoch.
+- Sessions now attach execution context and no longer own projects.
+
 
 - 任务完成与证据提交现在通过单个原子 mutation 完成，避免部分成功和重复 revision / Task completion and evidence submission now use one atomic mutation, preventing partial success and duplicate revision increments.
 - 增加固定 DSH/Node/pnpm 的 GitHub Actions 与私有 Codespaces 云端验收通道 / Added GitHub Actions and a private Codespaces acceptance lane pinned to DSH, Node, and pnpm.

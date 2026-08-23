@@ -1,49 +1,46 @@
-/** LearnLoop persisted vocabulary (state schema v4; storage unit remains v1). */
-export type TaskState='pending'|'active'|'blocked'|'completed'|'skipped'
-export type MasteryLevel='unassessed'|'introduced'|'practicing'|'demonstrated'|'mastered'
-export type AdjustmentState='proposed'|'applied'|'rejected'|'reverted'
-export type LearningMode='knowledge-first'|'balanced'|'practice-first'
-export type PracticeCapacity='none'|'light'|'full'
-export type ExplanationDepth='standard'|'deep'
-export type ExampleDensity='standard'|'high'
-export type ProjectAccess='none'|'owner'|'foreign'|'unbound'|'settings-only'
-export type LearnLoopErrorCode='PROJECT_NOT_FOUND'|'PROJECT_ALREADY_EXISTS'|'PROJECT_UNBOUND'|'SESSION_MISMATCH'|'SESSION_NOT_LIVE'|'PLAN_NOT_PUBLISHED'|'PLAN_ALREADY_PUBLISHED'|'INVALID_PLAN'|'TASK_NOT_FOUND'|'TASK_LOCKED'|'INVALID_TASK_TRANSITION'|'CHECK_NOT_ARMED'|'CHECK_ALREADY_ARMED'|'ANSWER_UNSUPPORTED'|'CANDIDATE_NOT_FOUND'|'CANDIDATE_NOT_READY'|'CANDIDATE_SOURCE_MISSING'|'ASSESSMENT_INVALID'|'EVIDENCE_MISMATCH'|'ADJUSTMENT_NOT_FOUND'|'INVALID_ADJUSTMENT'|'IDEMPOTENCY_KEY_REUSED'|'EXPORT_FORBIDDEN'|'REVISION_CONFLICT'
-export interface LearningPreferences{mode:LearningMode;practiceCapacity:PracticeCapacity;explanationDepth:ExplanationDepth;exampleDensity:ExampleDensity;additionalNotes:string}
-export type LearningTaskKind='lesson'|'worked-example'|'discussion'|'exercise'|'implementation'
-export type CompletionKind='short-answer'|'reflection'|'artifact'
-export interface CompletionRequirement{kind:CompletionKind;prompt:string}
-export interface LearningTask{id:string;title:string;objective:string;acceptanceCriteria:string[];estimateMinutes:number;status:TaskState;conceptIds:string[];dependsOn:string[];kind:LearningTaskKind;completion:CompletionRequirement}
-export interface Stage{id:string;title:string;tasks:LearningTask[]}
-export interface GeneratedPlanTaskInput{key:string;title:string;objective:string;acceptanceCriteria:string[];estimateMinutes:number;conceptKey:string;conceptTitle:string;dependsOn:string[];kind:LearningTaskKind;completion:CompletionRequirement}
-export interface GeneratedPlanStageInput{key:string;title:string;tasks:GeneratedPlanTaskInput[]}
-export interface GeneratedPlanInput{stages:GeneratedPlanStageInput[]}
-export interface PlanVersion{id:string;version:number;status:'draft'|'active'|'superseded'|'archived';createdAt:string;stages:Stage[]}
-export type EvidenceKind='explanation'|'pseudocode'|'implementation'|'hypothesis'|'assessment'|'reflection'
-export interface LegacyEvidence{provenance:'legacy';id:string;idempotencyKey:string;conceptId:string;kind:EvidenceKind;summary:string;source:{kind:'legacy';sessionId:string;messageRange:string};confidence:number;createdAt:string}
-export interface VerifiedEvidence{provenance:'verified';id:string;idempotencyKey:string;conceptId:string;kind:EvidenceKind;summary:string;assessmentId:string;source:{kind:'dsh-message';sessionId:string;messageIds:string[];eventSeqs:number[];contentHash:string};createdAt:string}
-export type Evidence=LegacyEvidence|VerifiedEvidence
-export interface MasteryState{conceptId:string;title:string;level:MasteryLevel;evidenceIds:string[];rationale:string;updatedAt:string}
-export interface LegacyAssessment{kind:'legacy';id:string;conceptId:string;result:'needs-work'|'passed'|'excellent';explanation:string;evidenceId:string;createdAt:string}
-export type CriterionResult='passed'|'partial'|'failed'
-export interface CriterionAssessment{criterionIndex:number;result:CriterionResult;explanation:string}
-export interface VerifiedTaskAssessment{kind:'verified-task';id:string;candidateId:string;taskId:string;conceptId:string;result:'needs-work'|'passed'|'excellent';criteria:CriterionAssessment[];misconceptions:string[];feedback:string;verifier:{provider:string;model:string;requestEventSeq:number;toolCallId:string;policyVersion:'learnloop-verifier-v1';rubricVersion:'learnloop-rubric-v1'};createdAt:string}
-export type Assessment=LegacyAssessment|VerifiedTaskAssessment
-export type EvidenceCandidateStatus='pending-verification'|'needs-work'|'accepted'|'cancelled'
-export interface EvidenceCandidate{id:string;taskId:string;conceptId:string;source:{sessionId:string;messageIds:string[];eventSeqs:number[];contentHash:string};answerText:string;status:EvidenceCandidateStatus;attempt:number;assessmentId:string|null;createdAt:string;updatedAt:string}
-export type LearningExecutionPhase='teaching'|'awaiting-answer'|'verifying'|'needs-revision'|'passed'|'paused'
-export interface LearningExecution{taskId:string;phase:LearningExecutionPhase;attempt:number;armedAfterSeq:number|null;candidateId:string|null;lastAssessmentId:string|null;updatedAt:string}
-export interface CommandReceipt{idempotencyKey:string;action:string;sessionId:string|null;payloadHash:string;resultRevision:number;createdAt:string}
-export type PlanOperation={type:'update-task';taskId:string;patch:Partial<Pick<LearningTask,'title'|'objective'|'acceptanceCriteria'|'estimateMinutes'|'status'>>}|{type:'move-task';taskId:string;toStageId:string;beforeTaskId?:string}
-export interface AdjustmentProposal{id:string;idempotencyKey:string;impact:'minor'|'major';state:AdjustmentState;reason:string;diff:string[];operations:PlanOperation[];inverseOperations?:PlanOperation[];createdAt:string;appliedPlanVersion?:number;revertedPlanVersion?:number}
-export interface LearningEvent{id:string;stableId:string;type:string;summary:string;createdAt:string}
-export interface LearnLoopSettings{language:'zh-CN'|'en';weeklyHours:number;strictness:'supportive'|'balanced'|'strict';autoMinorAdjustments:boolean;showModeExplanation:boolean;antiDependency:boolean}
-export type OnboardingState='inactive'|'interviewing'|'profile_review'|'planning'|'plan_review'|'active'|'cancelled'|'paused'|'completed'|'archived'|'legacy-unclaimed'
-export interface LearnerProfile{id:string;revision:number;goal:string;priorKnowledge:string;experienceLevel:'beginner'|'intermediate'|'advanced';knowledgeGaps:string[];learningPreferences:LearningPreferences;weeklyHours:number;deadline?:string;constraints:string[];successCriteria:string[];unansweredQuestions:string[];confirmedAt:string|null;createdAt:string;updatedAt:string}
-export interface LearningProject{id:string;workspaceId?:string;title:string;goal:string;experience:string;weeklyHours:number;status:'draft'|'active'|'paused'|'completed'|'archived'|'legacy-unclaimed';onboardingState?:OnboardingState;createdAt:string;sessionId:string|null;learningPreferences:LearningPreferences;profileRevision?:number}
-export interface ExecutionLease{sessionId:string;revision:number;acquiredAt:string;expiresAt:string}
-export interface WorkspaceLearningState{workspaceId:string;workspaceRootSnapshot?:string;workspaceDisplayName?:string;profile:LearnerProfile|null;profileRevision:number;projects:LearningProject[];activeProjectId:string|null;plans:PlanVersion[];evidence:Evidence[];mastery:MasteryState[];assessments:Assessment[];adjustments:AdjustmentProposal[];events:LearningEvent[];misconceptions:string[];reviewQueue:string[];execution:LearningExecution|null;evidenceCandidates:EvidenceCandidate[];activeSessionId:string|null;executionLease:ExecutionLease|null;revision:number}
-export interface LearningPlanSummary{workspaceId:string;workspaceDisplayName?:string;projectId:string;title:string;goal:string;status:LearningProject['status'];onboardingState?:OnboardingState;updatedAt:string;planVersions:number}
-export interface LegacyUnclaimedProject{project:LearningProject;plans:PlanVersion[];evidence:Evidence[];mastery:MasteryState[];assessments:Assessment[];adjustments:AdjustmentProposal[];ownerSessionId:string|null;migratedFromSchema:number}
-export interface LearnLoopState{schemaVersion:4;revision:number;settings:LearnLoopSettings;workspaces:Record<string,WorkspaceLearningState>;legacyUnclaimed:LegacyUnclaimedProject[];commandReceipts:CommandReceipt[];project:LearningProject|null;plans:PlanVersion[];evidence:Evidence[];mastery:MasteryState[];assessments:Assessment[];adjustments:AdjustmentProposal[];events:LearningEvent[];misconceptions:string[];reviewQueue:string[];execution:LearningExecution|null;evidenceCandidates:EvidenceCandidate[]}
-export interface LearnLoopProjection extends LearnLoopState{access:ProjectAccess;nextAction:LearningTask|null;learningPlans:LearningPlanSummary[]}
+import { z } from 'zod'
+
+const id = z.string().trim().min(1).max(256)
+const text = z.string().max(20_000)
+const timestamp = z.string().datetime()
+const revision = z.number().int().nonnegative().safe()
+const boundedStrings = z.array(z.string().trim().min(1).max(2_000)).max(100)
+
+export const learningPreferencesSchema = z.object({
+  mode: z.enum(['knowledge-first', 'balanced', 'practice-first']),
+  practiceCapacity: z.enum(['none', 'light', 'full']),
+  explanationDepth: z.enum(['standard', 'deep']),
+  exampleDensity: z.enum(['standard', 'high']),
+  additionalNotes: z.string().max(2_000),
+}).strict()
+
+export const learnerProfileSchema = z.object({id, revision, goal: text, priorKnowledge: text,
+  experienceLevel:z.enum(['beginner','intermediate','advanced']), knowledgeGaps:boundedStrings,
+  learningPreferences:learningPreferencesSchema, weeklyHours:z.number().int().min(1).max(80),
+  deadline:z.string().max(100).optional(), constraints:boundedStrings, successCriteria:boundedStrings.min(1),
+  unansweredQuestions:boundedStrings, confirmedAt:timestamp.nullable(), createdAt:timestamp, updatedAt:timestamp}).strict()
+export const completionRequirementSchema=z.object({kind:z.enum(['short-answer','reflection','artifact']),prompt:text}).strict()
+export const learningTaskSchema=z.object({id,title:text,objective:text,acceptanceCriteria:boundedStrings.min(1),estimateMinutes:z.number().int().min(1).max(480),status:z.enum(['pending','active','blocked','completed','skipped']),conceptIds:z.array(id).min(1).max(20),dependsOn:z.array(id).max(50),kind:z.enum(['lesson','worked-example','discussion','exercise','implementation']),completion:completionRequirementSchema}).strict()
+export const stageSchema=z.object({id,title:text,tasks:z.array(learningTaskSchema).min(1).max(20)}).strict()
+export const planVersionSchema=z.object({id,version:z.number().int().positive().safe(),status:z.enum(['draft','active','superseded','archived']),createdAt:timestamp,stages:z.array(stageSchema).min(1).max(8)}).strict()
+const criterionSchema=z.object({criterionIndex:z.number().int().nonnegative(),result:z.enum(['passed','partial','failed']),explanation:text}).strict()
+const verifierSchema=z.object({provider:id,model:id,requestEventSeq:revision,toolCallId:id,policyVersion:z.literal('learnloop-verifier-v1'),rubricVersion:z.literal('learnloop-rubric-v1')}).strict()
+export const assessmentSchema=z.object({kind:z.literal('verified-task'),id,candidateId:id,taskId:id,conceptId:id,result:z.enum(['needs-work','passed','excellent']),criteria:z.array(criterionSchema).min(1).max(100),misconceptions:boundedStrings,feedback:text,verifier:verifierSchema,createdAt:timestamp}).strict()
+const sourceSchema=z.object({kind:z.literal('dsh-message'),sessionId:id,messageIds:z.array(id).min(1).max(100),eventSeqs:z.array(revision).max(100),contentHash:z.string().regex(/^[a-f0-9]{64}$/)}).strict()
+export const evidenceSchema=z.object({provenance:z.literal('verified'),id,idempotencyKey:id,conceptId:id,kind:z.enum(['explanation','pseudocode','implementation','hypothesis','assessment','reflection']),summary:text,assessmentId:id,source:sourceSchema,createdAt:timestamp}).strict()
+export const masterySchema=z.object({conceptId:id,title:text,level:z.enum(['unassessed','introduced','practicing','demonstrated','mastered']),evidenceIds:z.array(id).max(500),rationale:text,updatedAt:timestamp}).strict()
+export const candidateSchema=z.object({id,taskId:id,conceptId:id,source:sourceSchema.omit({kind:true}),answerText:text.min(1),status:z.enum(['pending-verification','needs-work','accepted','cancelled']),attempt:revision,assessmentId:id.nullable(),createdAt:timestamp,updatedAt:timestamp}).strict()
+export const executionSchema=z.object({taskId:id,phase:z.enum(['teaching','awaiting-answer','verifying','needs-revision','passed','paused']),attempt:revision,armedAfterSeq:revision.nullable(),candidateId:id.nullable(),lastAssessmentId:id.nullable(),updatedAt:timestamp}).strict()
+const operationSchema=z.discriminatedUnion('type',[z.object({type:z.literal('update-task'),taskId:id,patch:z.object({title:text.optional(),objective:text.optional(),acceptanceCriteria:boundedStrings.optional(),estimateMinutes:z.number().int().min(1).max(480).optional()}).strict()}).strict(),z.object({type:z.literal('move-task'),taskId:id,toStageId:id,beforeTaskId:id.optional()}).strict()])
+export const adjustmentSchema=z.object({id,idempotencyKey:id,impact:z.enum(['minor','major']),state:z.enum(['proposed','applied','rejected','reverted']),reason:text,diff:boundedStrings,operations:z.array(operationSchema).max(100),inverseOperations:z.array(operationSchema).max(100).optional(),createdAt:timestamp,appliedPlanVersion:z.number().int().positive().optional(),revertedPlanVersion:z.number().int().positive().optional()}).strict()
+export const eventSchema=z.object({id,stableId:id,type:id,summary:text,createdAt:timestamp}).strict()
+export const projectSchema=z.object({id,title:text,phase:z.enum(['interviewing','profile_review','planning','plan_review','active','paused','completed','archived']),profile:learnerProfileSchema.nullable(),profileRevision:revision,plans:z.array(planVersionSchema).max(100),activePlanId:id.nullable(),evidence:z.array(evidenceSchema).max(10_000),mastery:z.array(masterySchema).max(10_000),assessments:z.array(assessmentSchema).max(10_000),adjustments:z.array(adjustmentSchema).max(1_000),evidenceCandidates:z.array(candidateSchema).max(10_000),misconceptions:boundedStrings,reviewQueue:boundedStrings,execution:executionSchema.nullable(),createdAt:timestamp,updatedAt:timestamp}).strict()
+export const workspaceSchema=z.object({workspaceId:id,workspaceRootSnapshot:z.string().max(4_096).optional(),workspaceDisplayName:z.string().max(500).optional(),revision,activeProjectId:id.nullable(),projects:z.record(id,projectSchema),activeSessionId:id.nullable(),events:z.array(eventSchema).max(10_000)}).strict()
+export const settingsSchema=z.object({language:z.enum(['zh-CN','en']),weeklyHours:z.number().int().min(1).max(80),strictness:z.enum(['supportive','balanced','strict']),autoMinorAdjustments:z.boolean(),showModeExplanation:z.boolean(),antiDependency:z.boolean()}).strict()
+export const receiptSchema=z.object({idempotencyKey:id,action:id,workspaceId:id.nullable(),projectId:id.nullable(),payloadHash:z.string().regex(/^[a-f0-9]{64}$/),resultRevision:revision,createdAt:timestamp}).strict()
+export const learnLoopStateSchema=z.object({schemaVersion:z.literal(5),revision,settings:settingsSchema,workspaces:z.record(id,workspaceSchema),commandReceipts:z.array(receiptSchema).max(20_000)}).strict()
+
+export type LearnLoopState=z.infer<typeof learnLoopStateSchema>; export type WorkspaceLearningState=z.infer<typeof workspaceSchema>; export type LearningProject=z.infer<typeof projectSchema>; export type LearnerProfile=z.infer<typeof learnerProfileSchema>; export type LearningTask=z.infer<typeof learningTaskSchema>; export type PlanVersion=z.infer<typeof planVersionSchema>; export type Evidence=z.infer<typeof evidenceSchema>; export type Assessment=z.infer<typeof assessmentSchema>; export type EvidenceCandidate=z.infer<typeof candidateSchema>; export type CriterionAssessment=z.infer<typeof criterionSchema>; export type VerifiedTaskAssessment=Assessment; export type LearningPreferences=z.infer<typeof learningPreferencesSchema>; export type CommandReceipt=z.infer<typeof receiptSchema>
+export type GeneratedPlanInput={stages:Array<{key:string;title:string;tasks:Array<{key:string;title:string;objective:string;acceptanceCriteria:string[];estimateMinutes:number;conceptKey:string;conceptTitle:string;dependsOn:string[];kind:LearningTask['kind'];completion:LearningTask['completion']}>}>}
+export type LearnLoopErrorCode='PROJECT_NOT_FOUND'|'PROJECT_ALREADY_EXISTS'|'SESSION_MISMATCH'|'SESSION_NOT_LIVE'|'PLAN_NOT_PUBLISHED'|'PLAN_ALREADY_PUBLISHED'|'INVALID_PLAN'|'TASK_NOT_FOUND'|'TASK_LOCKED'|'INVALID_TASK_TRANSITION'|'CHECK_NOT_ARMED'|'CHECK_ALREADY_ARMED'|'ANSWER_UNSUPPORTED'|'CANDIDATE_NOT_FOUND'|'CANDIDATE_NOT_READY'|'CANDIDATE_SOURCE_MISSING'|'ASSESSMENT_INVALID'|'EVIDENCE_MISMATCH'|'ADJUSTMENT_NOT_FOUND'|'INVALID_ADJUSTMENT'|'IDEMPOTENCY_KEY_REUSED'|'EXPORT_FORBIDDEN'|'REVISION_CONFLICT'
 export interface StateTable{get(id:string):LearnLoopState|undefined;put(id:string,value:LearnLoopState):Promise<void>;update(id:string,update:(current:LearnLoopState)=>LearnLoopState):Promise<LearnLoopState>}
