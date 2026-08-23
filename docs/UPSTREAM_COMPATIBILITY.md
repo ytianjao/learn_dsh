@@ -19,7 +19,7 @@ On upgrade, run `npm run test:compat && npm run build && npm test`, then smoke-t
 
 ## Runtime hardening (PR #20)
 
-A LearnLoop project is bound to exactly one DSH Session. The Host returns a server-redacted projection to foreign sessions and rejects their project mutations; this local product-state isolation prevents accidental cross-session access, but is not multi-user or multi-tenant authentication. Same-origin remains the HTTP write boundary and LearnLoop never receives model credentials.
+A LearnLoop Workspace may attach its active Project to the current DSH Session for execution. The Host returns a server-redacted projection to foreign sessions and rejects their project mutations; this local product-state isolation prevents accidental cross-session access, but is not multi-user or multi-tenant authentication. Same-origin remains the HTTP write boundary and LearnLoop never receives model credentials.
 
 Task status changes are available only through semantic commands: start, pause, resume, skip, safe restore, and atomic completion with evidence. A blocked task remains the current learning position; only completed or skipped dependencies are satisfied, and skipping never means mastery. Completing a task does not auto-start its successor.
 
@@ -27,3 +27,8 @@ Invariants: `project.sessionId === mutation.sessionId`; active and blocked curre
 
 ## rc.8 session integration
 Verified-answer integration is constrained to pinned DSH 0.1.0-rc.8 public agent/session/tool surfaces: waterfall pre-step decisions, direct user-message source kinds, public Session events, and tool execution agent/call/signal provenance. DSH source and provider credentials remain untouched.
+
+
+## Canonical persistence boundary (0.2.0)
+
+Schema 5 stores business data only at `workspaces[workspaceId].projects[projectId]`. Projects independently own profile, plans, execution, candidates, verified evidence and assessments, mastery, adjustments, and review state. `activeSessionId` is an execution attachment, not ownership. API v2 reads by Workspace; storage unit 2 rejects earlier LearnLoop states. No code automatically resets or deletes DSH data.

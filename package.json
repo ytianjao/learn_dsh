@@ -1,6 +1,6 @@
 {
   "name": "@learnloop/dsh-learnloop",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Local-first long-term learning companion for DeepSeek Harness Web",
   "type": "module",
   "license": "MIT",
@@ -39,7 +39,6 @@
     "test": "vitest run",
     "test:unit": "vitest run tests/domain.spec.ts",
     "test:integration": "vitest run tests/http.spec.ts",
-    "test:compat": "vitest run tests/compatibility.spec.ts",
     "test:health": "python -m pytest tests/test_health.py",
     "test:e2e": "node ./node_modules/@playwright/test/cli.js test",
     "acceptance:prepare": "bash scripts/cloud-acceptance-prepare.sh",
@@ -52,7 +51,8 @@
     "test:evidence": "vitest run tests/evidence-bridge.spec.ts",
     "test:assessment": "vitest run tests/assessment-tool.spec.ts",
     "test:prompt": "vitest run tests/prompt.spec.ts",
-    "test:runtime": "vitest run tests/assessment-tool.spec.ts tests/evidence-bridge.spec.ts tests/prompt.spec.ts"
+    "test:runtime": "vitest run tests/assessment-tool.spec.ts tests/evidence-bridge.spec.ts tests/prompt.spec.ts",
+    "test:upstream-contract": "vitest run tests/upstream-contract.spec.ts"
   },
   "engines": {
     "node": "^22.19.0 || >=24"
