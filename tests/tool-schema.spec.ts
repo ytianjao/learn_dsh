@@ -18,10 +18,10 @@ describe('tool parameter schemas',()=>{
   it('documents workspace-scoped optimistic revisions for agent tools',async()=>{
     const source=await readFile('src/tool.ts','utf8')
     expect(source).toContain('workspaces[workspaceId].revision')
-    expect(source).toContain('this is not the top-level state revision')
+    expect(source).toContain('this is not the top-level state revision');expect(source).toContain('projectId=${v.projectId}, revision=${v.revision}');expect(source).toContain('planId=${v.planId}, revision=${v.revision}')
   })
   it('guards plan and progress views while no active plan exists',async()=>{
     const source=await readFile('client/bundle.js','utf8')
-    expect(source.match(/if\(!plan\)return/g)).toHaveLength(2)
+    expect(source.match(/if\(!plan\)return/g)).toHaveLength(2);expect(source).toContain('将当前工作目录的绝对路径作为稳定 workspaceId');expect(source).toContain('sessionId:props.sessionId');expect(source).not.toContain('sessionId:s.project.sessionId')
   })
 })
