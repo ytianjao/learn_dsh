@@ -13,8 +13,8 @@ window.__ModuleLoader__.load({
       const stores = new Map()
       function workspaceIdForSession(sessionId, workspaces) {
         if (!sessionId) return null
-        const found = (workspaces || []).find(function (workspace) { return (workspace.sessionIds || []).includes(sessionId) })
-        return found ? found.workspaceId : null
+        const found = (workspaces || []).filter(function (workspace) { return (workspace.sessionIds || []).includes(sessionId) })
+        return found.length === 1 ? found[0].workspaceId : null
       }
       function createStore(workspaceId) { return { workspaceId: workspaceId, status: workspaceId ? 'loading' : 'empty/no-workspace', value: null, error: null, request: 0, listeners: new Set() } }
       function storeFor(workspaceId) { const key = workspaceId || '__no-workspace__'; if (!stores.has(key)) stores.set(key, createStore(workspaceId)); return stores.get(key) }
