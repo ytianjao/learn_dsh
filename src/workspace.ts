@@ -56,8 +56,18 @@ function taskInput(state:LearnLoopState,input:{workspaceId:string;projectId:stri
   if(action==='task:start'&&nextAction(p)?.id!==task.id)fail('TASK_LOCKED','Only nextAction can start.');
   if(p.evidenceCandidates.some(c=>c.status==='pending-verification')||p.execution&&['awaiting-answer','verifying','needs-revision'].includes(p.execution.phase))fail('TASK_LOCKED','A check is unsettled.');
  }
+ if(['task:pause','task:skip','task:restore'].includes(action)){
+  if(p.execution&&['awaiting-answer','verifying'].includes(p.execution.phase))fail('INVALID_TASK_TRANSITION','The current check must settle before changing task state.');
+  if(p.evidenceCandidates.some(c=>c.status==='pending-verification'))fail('CANDIDATE_NOT_READY','A verification candidate must settle before changing task state.');
+ }
+ if(action==='task:restore'){
+  const descendants=new Set<string>();let changed=true;
+  while(changed){changed=false;for(const possible of tasks)if(!descendants.has(possible.id)&&possible.dependsOn.some(id=>id===task.id||descendants.has(id))){descendants.add(possible.id);changed=true}}
+  const unsafe=tasks.some(t=>descendants.has(t.id)&&['active','blocked','completed'].includes(t.status))||p.assessments.some(a=>descendants.has(a.taskId))||p.evidence.some(e=>{const assessment=p.assessments.find(a=>a.id===e.assessmentId);return Boolean(assessment&&descendants.has(assessment.taskId))});
+  if(unsafe)fail('TASK_LOCKED','A dependent task has already advanced; restoring this task would reverse causality.');
+ }
  const at=now(),plans=p.plans.map(plan=>plan.id===p.activePlanId?{...plan,stages:plan.stages.map(stage=>({...stage,tasks:stage.tasks.map(t=>t.id===task.id?{...t,status:to}:t)}))}:plan);
- const execution=to==='active'?{taskId:task.id,phase:'teaching' as const,attempt:p.execution?.taskId===task.id?p.execution.attempt:0,armedAfterSeq:null,candidateId:null,lastAssessmentId:p.execution?.taskId===task.id?p.execution.lastAssessmentId:null,updatedAt:at}:p.execution?.taskId===task.id?{...p.execution,phase:'paused' as const,candidateId:null,updatedAt:at}:p.execution;
+ const execution=to==='active'?{taskId:task.id,phase:'teaching' as const,attempt:p.execution?.taskId===task.id?p.execution.attempt:0,armedAfterSeq:null,candidateId:null,lastAssessmentId:p.execution?.taskId===task.id?p.execution.lastAssessmentId:null,updatedAt:at}:p.execution?.taskId===task.id?{...p.execution,phase:'paused' as const,armedAfterSeq:null,updatedAt:at}:p.execution;
  return{...w,projects:{...w.projects,[p.id]:{...p,plans,execution,updatedAt:at}}}})}
 export const startTask=(s:LearnLoopState,i:Parameters<typeof taskInput>[1])=>taskInput(s,i,'task:start',['pending'],'active');
 export const pauseTask=(s:LearnLoopState,i:Parameters<typeof taskInput>[1])=>taskInput(s,i,'task:pause',['active'],'blocked');
