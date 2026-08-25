@@ -52,8 +52,8 @@ jobs:
             --port 8000 \
             --sequence tool_call_success,success \
             --repeat-last \
-            --tool-name learnloop_publish_plan \
-            --tool-arguments '{"stages":[{"key":"mock-stage","title":"Mock Generated Stage","tasks":[{"key":"mock-runtime","title":"Mock Generated Runtime Task","objective":"Learn generated behavior","acceptanceCriteria":["Explain generated behavior"],"estimateMinutes":30,"conceptKey":"mock-runtime","conceptTitle":"Mock Runtime","dependsOn":[],"kind":"lesson","completion":{"kind":"short-answer","prompt":"Explain generated behavior"}},{"key":"mock-practice","title":"Mock Generated Practice","objective":"Practice generated behavior","acceptanceCriteria":["Complete deterministic practice"],"estimateMinutes":30,"conceptKey":"mock-practice","conceptTitle":"Mock Practice","dependsOn":["mock-runtime"],"kind":"worked-example","completion":{"kind":"reflection","prompt":"Reflect on the worked example"}}]}]}' \
+            --tool-name learnloop_create_plan_draft \
+            --tool-arguments '{"plan":{"stages":[{"title":"Mock Runtime Stage","outcome":"Understand one deterministic runtime boundary.","tasks":[{"title":"Runtime state boundary","objective":"Explain the boundary between global and execution state.","activity":"explain","acceptanceCriteria":["Explain global status.","Explain execution checkpoint state."],"checkPrompt":"Explain both boundaries in your own words.","estimateMinutes":30},{"title":"Runtime worked example","objective":"Apply the boundary to a recovery scenario.","activity":"example","acceptanceCriteria":["Identify which state must be restored."],"checkPrompt":"Explain why the example restores that state.","estimateMinutes":30}]}]}}' \
             --success-text 'Mock LearnLoop teaching response.' \
             >mock-provider.log 2>&1 &
           echo $! >mock-provider.pid
