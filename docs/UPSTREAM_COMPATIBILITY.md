@@ -32,3 +32,13 @@ Verified-answer integration is constrained to pinned DSH 0.1.0-rc.8 public agent
 ## Canonical persistence boundary (0.2.0)
 
 Schema 5 stores business data only at `workspaces[workspaceId].projects[projectId]`. Projects independently own profile, plans, execution, candidates, verified evidence and assessments, mastery, adjustments, and review state. `activeSessionId` is an execution attachment, not ownership. API v2 reads by Workspace; storage unit 2 rejects earlier LearnLoop states. No code automatically resets or deletes DSH data.
+
+## rc.8 Tool schema audit for Plan Intent
+
+Pinned DSH rc.8 publicly supports `defineTool`, `title`, `description`, `examples`, `enum`,
+`const`, `oneOf`, and explicit-object `additionalProperties`. Its implicit parameter root is
+open, so the plan executor rejects root keys other than `plan` before reading state. Typed
+validation raises `INVALID_ARGS` before the executor. `finalizeContent` receives normalized
+failures and is used to explain an invalid activity path/value/allowed set without retrying or
+rewriting it. The returned Tool definition exposes its canonical schema and validated executor
+as the public testing seam. No upstream code is modified.

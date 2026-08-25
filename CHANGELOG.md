@@ -44,3 +44,12 @@ Invariants: `project.sessionId === mutation.sessionId`; active and blocked curre
 ## Unreleased
 - Added state schema v3, payload-bound command receipts, session-backed Evidence Candidates, criterion-complete verified assessments, and owner-only project export.
 - Removed the browser-authoritative evidence/completion route; expected domain errors now carry stable codes.
+
+## 0.4.0
+
+- **Breaking:** replaced the domain-shaped plan Tool with `learnloop_create_plan_draft`, whose
+  sole model argument is a minimal, closed Plan Intent.
+- Host now compiles canonical text-verified tasks and owns identity, revisions, idempotency,
+  IDs, linear dependencies, and status.
+- Upgraded state schema to 6, Storage Domain to 3, HTTP API to v3, and backups to format 3.
+  No migration, compatibility aliases, or legacy backup import are provided.

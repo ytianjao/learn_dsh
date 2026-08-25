@@ -14,7 +14,7 @@ DSH Chat remains the default input surface. LearnLoop adds onboarding, current t
 
 空状态、加载失败、连接失败和冲突必须显示可操作反馈。当前 v1 明确使用确定性的 Agent 工程初始模板，不把模板描述成语义生成结果。
 
-Empty, waiting-for-model, loading, disconnected, and conflict states must offer actionable feedback. Only a validated learnloop_publish_plan call creates the authoritative plan.
+Empty, waiting-for-model, loading, disconnected, and conflict states must offer actionable feedback. Only a validated learnloop_create_plan_draft call creates the authoritative plan.
 
 ## 学习规则 / Learning rules
 
@@ -49,9 +49,9 @@ LearnLoop never receives model credentials. The mutation API requires same origi
 
 ## DSH Chat generated plans (PR #13)
 
-LearnLoop now creates an empty active plan and sends a structured planning request through the public DSH Chat `InputActions`. The selected DSH model must publish the complete authoritative plan with `learnloop_publish_plan`; LearnLoop never reads API keys, calls a provider, or parses assistant prose. The Host validates keys, sizes, uniqueness, dependency references and DAG shape, then assigns IDs/status/version and commits plan, mastery, events, and one revision atomically.
+LearnLoop now creates an empty active plan and sends a structured planning request through the public DSH Chat `InputActions`. The selected DSH model must publish the complete authoritative plan with `learnloop_create_plan_draft`; LearnLoop never reads API keys, calls a provider, or parses assistant prose. The Host validates keys, sizes, uniqueness, dependency references and DAG shape, then assigns IDs/status/version and commits plan, mastery, events, and one revision atomically.
 
-User flow: (1) configure and select a model in **DSH Settings → Models**; (2) enter a LearnLoop goal; (3) choose **Start learning**; (4) observe the planning request in Chat; (5) the model calls `learnloop_publish_plan`; (6) the model introduces the returned first task; (7) choose **Start task in chat** for teaching; (8) submit your own evidence in LearnLoop; (9) export before using **Discard current plan** to start over. Normal `dsh web` uses the selected user model; only browser E2E uses the deterministic mock provider.
+User flow: (1) configure and select a model in **DSH Settings → Models**; (2) enter a LearnLoop goal; (3) choose **Start learning**; (4) observe the planning request in Chat; (5) the model calls `learnloop_create_plan_draft`; (6) the model introduces the returned first task; (7) choose **Start task in chat** for teaching; (8) submit your own evidence in LearnLoop; (9) export before using **Discard current plan** to start over. Normal `dsh web` uses the selected user model; only browser E2E uses the deterministic mock provider.
 
 DSH owns session, Chat, model routing, streaming, credentials, and the tool execution runtime. LearnLoop owns the learning project, validated structured plan, evidence, mastery, review, and plan-publication rules. Discard is destructive, not history archival: it removes current business data while preserving settings. Export first when an audit copy is required.
 
@@ -86,3 +86,12 @@ Verified Answer Loop v1 accepts text only. It does not automatically verify imag
 ## Canonical persistence boundary (0.2.0)
 
 Schema 5 stores business data only at `workspaces[workspaceId].projects[projectId]`. Projects independently own profile, plans, execution, candidates, verified evidence and assessments, mastery, adjustments, and review state. `activeSessionId` is an execution attachment, not ownership. API v2 reads by Workspace; storage unit 2 rejects earlier LearnLoop states. No code automatically resets or deletes DSH data.
+
+## Canonical Plan Intent contract (0.4.0)
+
+Models submit only ordered stages with learner-visible title/outcome and tasks containing
+`title`, `objective`, `activity`, `acceptanceCriteria`, `checkPrompt`, and `estimateMinutes`.
+The Host compiles UUID identities, a deterministic linear dependency chain, pending statuses,
+and a draft plan atomically. Current verification is text-only. Artifact/file/repository
+verification is not supported in the current canonical contract. Legacy state and contracts
+are rejected rather than migrated or silently reset.
