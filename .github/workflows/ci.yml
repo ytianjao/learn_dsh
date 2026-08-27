@@ -5,19 +5,15 @@ on:
     branches: [main, work]
 permissions:
   contents: read
-x-node: &node
-  uses: actions/setup-node@v5
-  with: {node-version: 22.19.0, cache: pnpm}
-x-pnpm: &pnpm
-  uses: pnpm/action-setup@v4
-  with: {version: 11.7.0, run_install: false}
 jobs:
   build-typecheck:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - *pnpm
-      - *node
+      - uses: pnpm/action-setup@v4
+        with: {version: 11.7.0, run_install: false}
+      - uses: actions/setup-node@v5
+        with: {node-version: 22.19.0, cache: pnpm}
       - run: pnpm install --frozen-lockfile
       - run: pnpm run build
       - run: pnpm run typecheck
@@ -25,36 +21,44 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - *pnpm
-      - *node
+      - uses: pnpm/action-setup@v4
+        with: {version: 11.7.0, run_install: false}
+      - uses: actions/setup-node@v5
+        with: {node-version: 22.19.0, cache: pnpm}
       - run: pnpm install --frozen-lockfile
       - run: pnpm run lint
   unit-domain:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - *pnpm
-      - *node
+      - uses: pnpm/action-setup@v4
+        with: {version: 11.7.0, run_install: false}
+      - uses: actions/setup-node@v5
+        with: {node-version: 22.19.0, cache: pnpm}
       - run: pnpm install --frozen-lockfile
       - run: pnpm run test:unit
   unit-runtime-http-tool:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - *pnpm
-      - *node
+      - uses: pnpm/action-setup@v4
+        with: {version: 11.7.0, run_install: false}
+      - uses: actions/setup-node@v5
+        with: {node-version: 22.19.0, cache: pnpm}
       - run: pnpm install --frozen-lockfile
       - run: pnpm run test:integration
       - run: pnpm run test:runtime
-      - run: pnpm run test:compat
+      - run: pnpm run test:upstream-contract
       - run: pnpm run test:prompt
       - run: pnpm run test:health
   full-suite:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - *pnpm
-      - *node
+      - uses: pnpm/action-setup@v4
+        with: {version: 11.7.0, run_install: false}
+      - uses: actions/setup-node@v5
+        with: {node-version: 22.19.0, cache: pnpm}
       - run: pnpm install --frozen-lockfile
       - run: pnpm run check
       - run: pnpm run package:validate
