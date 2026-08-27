@@ -4,7 +4,7 @@ LearnLoop is a local-first learning companion for DSH `0.1.0-rc.8` (baseline `14
 
 ## Canonical workspace model (0.2.0)
 
-Persisted schema 6 has one root: `schemaVersion`, `revision`, `settings`, `workspaces`, and scoped `commandReceipts`. Each Workspace owns project identities, `activeProjectId`, `activeSessionId`, revision, and events. Each Project aggregate owns its profile, immutable plan versions, execution, candidates, verified assessments and evidence, mastery, adjustments, misconceptions, and review queue. A Session is only the current execution attachment; changing sessions does not move or copy a project.
+Persisted schema 7 has one root: `schemaVersion`, `revision`, `settings`, `workspaces`, and scoped `commandReceipts`. Each Workspace owns project identities, `activeProjectId`, `activeSessionId`, revision, and events. Each Project aggregate owns its profile, immutable plan versions, execution, candidates, verified assessments and evidence, mastery, adjustments, misconceptions, and review queue. A Session is only the current execution attachment; changing sessions does not move or copy a project.
 
 The HTTP boundary is `/learnloop/api/v3/state`, `/learnloop/api/v3/manage`, and `/learnloop/api/v3/export`. State reads are scoped by `workspaceId`; backup format 3 exports only the canonical Workspace aggregate and current settings.
 

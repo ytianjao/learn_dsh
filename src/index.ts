@@ -8,7 +8,7 @@ import type {} from '@deepseek-ai/dsh-workspace'
 import { emptyState, ensureState, learnLoopDomainSpec } from './domain.js'
 import { API_PATH, EXPORT_PATH, MANAGE_PATH, createLearnLoopHttpHandler } from './http.js'
 import type { StateTable } from './types.js'
-import { createLearnLoopApprovePlanTool, createLearnLoopBeginOnboardingTool, createLearnLoopCommitProfileTool, createLearnLoopConfirmProfileTool, createLearnLoopCreatePlanDraftTool } from './tool.js'
+import { createLearnLoopApprovePlanTool, createLearnLoopBeginOnboardingTool, createLearnLoopCommitProfileTool, createLearnLoopConfirmProfileTool, createLearnLoopCreatePlanDraftTool, createLearnLoopRequestPlanRevisionTool } from './tool.js'
 import { createLearnLoopAssessmentTool } from './assessment-tool.js'
 import { renderLearnLoopSystemSection } from './prompt.js'
 import { capturePreStepAnswer, enrichCandidateEvent, type AuthoritativeUserMessage } from './evidence-bridge.js'
@@ -38,6 +38,7 @@ export async function apply(ctx: Context): Promise<void> {
   ctx.effect(() => ctx.tools.register(createLearnLoopCommitProfileTool(table, workspaceResolver)), 'learnloop.commitProfileTool()')
   ctx.effect(() => ctx.tools.register(createLearnLoopConfirmProfileTool(table, workspaceResolver)), 'learnloop.confirmProfileTool()')
   ctx.effect(() => ctx.tools.register(createLearnLoopCreatePlanDraftTool(table, workspaceResolver)), 'learnloop.createPlanDraftTool()')
+  ctx.effect(() => ctx.tools.register(createLearnLoopRequestPlanRevisionTool(table, workspaceResolver)), 'learnloop.requestPlanRevisionTool()')
   ctx.effect(() => ctx.tools.register(createLearnLoopApprovePlanTool(table, workspaceResolver)), 'learnloop.approvePlanTool()')
   const sessionReader = {
     tailSeq: (id: string) => ctx.sessions.list().find(item => String(item.id) === id)?.seq ?? null,

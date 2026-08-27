@@ -17,7 +17,8 @@ export const planIntentSchema = z.object({ stages: z.array(planStageIntentSchema
 export type PlanIntent = z.infer<typeof planIntentSchema>
 export type PlanIntentActivity = z.infer<typeof planIntentActivitySchema>
 
-const normalized = (value: string) => value.trim().toLocaleLowerCase()
+// Domain uniqueness must not vary with the host machine's locale.
+const normalized = (value: string) => value.trim().toLowerCase()
 const invalid = (message: string): never => { throw new LearnLoopDomainError('INVALID_PLAN', message) }
 export function validatePlanIntent(value: unknown, profile: LearnerProfile): PlanIntent {
   const parsed = planIntentSchema.safeParse(value)

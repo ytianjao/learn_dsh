@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { activeProject, beginWorkspaceOnboarding, commitWorkspaceProfile, compilePlanIntent, confirmWorkspaceProfile, createPlanDraftFromIntent, emptyState, validatePlanIntent, workspaceOf } from '../src/index.js'
+import { activeProject, approveWorkspacePlan, beginWorkspaceOnboarding, commitWorkspaceProfile, compilePlanIntent, confirmWorkspaceProfile, createPlanDraftFromIntent, emptyState, requestPlanDraftRevision, validatePlanIntent, workspaceOf } from '../src/index.js'
 
 const intent = { stages: [{ title: 'Foundations', outcome: 'Understand boundaries.', tasks: [
   { title: 'Explain state', objective: 'Explain the boundary.', activity: 'explain' as const, acceptanceCriteria: ['Explain global state.'], checkPrompt: 'Explain the boundary.', estimateMinutes: 30 },
@@ -27,6 +27,27 @@ describe('Plan Intent compiler', () => {
     expect(createPlanDraftFromIntent(first, { sessionId: 'session', callId: 'call', plan: intent })).toBe(first)
     expect(() => createPlanDraftFromIntent(first, { sessionId: 'session', callId: 'call', plan: { ...intent, stages: [{ ...intent.stages[0]!, title: 'Changed' }] } })).toThrowError(expect.objectContaining({ code: 'IDEMPOTENCY_KEY_REUSED' }))
     expect(activeProject(workspaceOf(first, 'ws')).phase).toBe('plan_review')
+  })
+  it('restores the canonical draft result after approval instead of scanning current state', () => {
+    let state = createPlanDraftFromIntent(planning(), { sessionId: 'session', callId: 'call', plan: intent })
+    const original = state.commandReceipts.find(receipt => receipt.idempotencyKey === 'plan-draft:call')!.result
+    const project = activeProject(workspaceOf(state, 'ws'))
+    state = approveWorkspacePlan(state, { workspaceId: 'ws', projectId: project.id, planId: project.plans[0]!.id, expectedRevision: 4, idempotencyKey: 'approve', sessionId: 'session' })
+    const replayed = createPlanDraftFromIntent(state, { sessionId: 'session', callId: 'call', plan: intent })
+    expect(replayed).toBe(state)
+    expect(replayed.commandReceipts.find(receipt => receipt.idempotencyKey === 'plan-draft:call')!.result).toEqual(original)
+    expect(activeProject(workspaceOf(replayed, 'ws')).plans).toHaveLength(1)
+  })
+  it('archives an explicitly rejected draft and permits a strictly newer draft', () => {
+    let state = createPlanDraftFromIntent(planning(), { sessionId: 'session', callId: 'v1', plan: intent })
+    state = requestPlanDraftRevision(state, { sessionId: 'session', callId: 'revise', reason: 'Use a clearer recovery example.' })
+    const replayed = requestPlanDraftRevision(state, { sessionId: 'session', callId: 'revise', reason: 'Use a clearer recovery example.' })
+    expect(replayed).toBe(state)
+    expect(activeProject(workspaceOf(state, 'ws')).plans[0]!.status).toBe('archived')
+    state = createPlanDraftFromIntent(state, { sessionId: 'session', callId: 'v2', plan: intent })
+    const project = activeProject(workspaceOf(state, 'ws'))
+    expect(project.plans.map(plan => [plan.version, plan.status])).toEqual([[1, 'archived'], [2, 'draft']])
+    expect(() => approveWorkspacePlan(state, { workspaceId: 'ws', projectId: project.id, planId: project.plans[0]!.id, expectedRevision: 6, idempotencyKey: 'old', sessionId: 'session' })).toThrowError(expect.objectContaining({ code: 'PLAN_NOT_PUBLISHED' }))
   })
   it('rejects malformed and preference-invalid intents without mutation', () => {
     const state = planning(), profile = activeProject(workspaceOf(state, 'ws')).profile!
