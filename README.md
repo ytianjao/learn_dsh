@@ -47,3 +47,7 @@ State schema 5, Storage Domain version 2, HTTP API v2, backup format 2, and the 
 Tool are rejected and have no migration or alias. Stop DSH, then either use a fresh isolated
 `DSH_HOME` or clear only the LearnLoop Storage Domain. Do not delete model credentials,
 Workspaces, Sessions, or unrelated plugin data. Restart DSH and enable learning mode again.
+
+### Agent protocol
+
+The **Start learning mode** button is the only activation boundary: the Host creates an `interviewing` Project before submitting “开始建立我的学习档案。 / Start building my learning profile.” No onboarding tool is exposed to the model. DSH rc.8 registers tools globally, so LearnLoop publishes an exact phase allow-list in each system prompt and independently enforces it at the Tool executor/domain boundary. Plan approval activates the plan but leaves every task pending; the learner must explicitly start the first task in LearnLoop.

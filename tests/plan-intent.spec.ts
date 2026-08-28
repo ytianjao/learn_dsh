@@ -8,8 +8,8 @@ const intent = { stages: [{ title: 'Foundations', outcome: 'Understand boundarie
 function planning() {
   let state = beginWorkspaceOnboarding(emptyState(), { workspaceId: 'ws', sessionId: 'session', expectedRevision: 0, idempotencyKey: 'begin' })
   const projectId = workspaceOf(state, 'ws').activeProjectId!
-  state = commitWorkspaceProfile(state, { workspaceId: 'ws', projectId, expectedRevision: 1, idempotencyKey: 'profile', goal: 'Learn', priorKnowledge: '', experienceLevel: 'beginner', knowledgeGaps: [], learningMode: 'balanced', practiceCapacity: 'none', weeklyHours: 4, constraints: [], successCriteria: ['Explain'], unansweredQuestions: [] })
-  return confirmWorkspaceProfile(state, { workspaceId: 'ws', projectId, profileRevision: 1, expectedRevision: 2, idempotencyKey: 'confirm' })
+  state = commitWorkspaceProfile(state, { workspaceId: 'ws', projectId, sessionId: 'session', expectedRevision: 1, idempotencyKey: 'profile', goal: 'Learn', priorKnowledge: '', experienceLevel: 'beginner', knowledgeGaps: [], learningMode: 'balanced', practiceCapacity: 'none', weeklyHours: 4, constraints: [], successCriteria: ['Explain'], unansweredQuestions: [] })
+  return confirmWorkspaceProfile(state, { workspaceId: 'ws', projectId, sessionId: 'session', profileRevision: 1, expectedRevision: 2, idempotencyKey: 'confirm' })
 }
 describe('Plan Intent compiler', () => {
   it('generates canonical identities and a deterministic linear DAG', () => {
@@ -47,7 +47,7 @@ describe('Plan Intent compiler', () => {
     state = createPlanDraftFromIntent(state, { sessionId: 'session', callId: 'v2', plan: intent })
     const project = activeProject(workspaceOf(state, 'ws'))
     expect(project.plans.map(plan => [plan.version, plan.status])).toEqual([[1, 'archived'], [2, 'draft']])
-    expect(() => approveWorkspacePlan(state, { workspaceId: 'ws', projectId: project.id, planId: project.plans[0]!.id, expectedRevision: 6, idempotencyKey: 'old', sessionId: 'session' })).toThrowError(expect.objectContaining({ code: 'PLAN_NOT_PUBLISHED' }))
+    expect(() => approveWorkspacePlan(state, { workspaceId: 'ws', projectId: project.id, planId: project.plans[0]!.id, expectedRevision: 6, idempotencyKey: 'old', sessionId: 'session' })).toThrowError(expect.objectContaining({ code: 'PLAN_APPROVAL_MISMATCH' }))
   })
   it('rejects malformed and preference-invalid intents without mutation', () => {
     const state = planning(), profile = activeProject(workspaceOf(state, 'ws')).profile!
