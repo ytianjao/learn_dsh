@@ -37,13 +37,13 @@ Pre-canonical persisted states and backup format 1 are intentionally unsupported
 
 The pinned DSH release does not expose a documented, safe command for selectively deleting one plugin domain. Consequently this project does not publish a destructive filesystem command. If selective cleanup cannot be established safely, start DSH with a new isolated `DSH_HOME` and retain the old directory as a backup.
 
-## Breaking upgrade to 0.4.0
+## Breaking upgrade to 0.5.0
 
 The model-facing planning contract is **Plan Intent only**. Workspace, Project, revisions,
 idempotency, IDs, dependencies, and status are Host-owned. Canonical task verification is
 text-only; artifact, file, upload, and repository verification are not supported.
 
-State schema 5, Storage Domain version 2, HTTP API v2, backup format 2, and the former plan
+State schema 8, Storage Domain version 2, HTTP API v2, backup format 2, and the former plan
 Tool are rejected and have no migration or alias. Stop DSH, then either use a fresh isolated
 `DSH_HOME` or clear only the LearnLoop Storage Domain. Do not delete model credentials,
 Workspaces, Sessions, or unrelated plugin data. Restart DSH and enable learning mode again.

@@ -56,7 +56,7 @@ Arm the active task, answer in normal Chat, observe needs-work without evidence/
 
 ## Canonical persistence boundary (0.2.0)
 
-Schema 5 stores business data only at `workspaces[workspaceId].projects[projectId]`. Projects independently own profile, plans, execution, candidates, verified evidence and assessments, mastery, adjustments, and review state. `activeSessionId` is an execution attachment, not ownership. API v2 reads by Workspace; storage unit 2 rejects earlier LearnLoop states. No code automatically resets or deletes DSH data.
+Schema 8 stores business data only at `workspaces[workspaceId].projects[projectId]`. Projects independently own profile, plans, execution, candidates, verified evidence and assessments, mastery, adjustments, and review state. `activeSessionId` is an execution attachment, not ownership. API v3 reads by Workspace; storage domain 5 rejects earlier LearnLoop states. No code automatically resets or deletes DSH data.
 
 ## Current LearnLoop interaction protocol
 
