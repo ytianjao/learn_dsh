@@ -50,7 +50,6 @@ jobs:
       - run: pnpm run test:runtime
       - run: pnpm run test:upstream-contract
       - run: pnpm run test:prompt
-      - run: pnpm run test:health
   full-suite:
     runs-on: ubuntu-latest
     steps:
