@@ -2,6 +2,7 @@ import { defineTool } from '@deepseek-ai/dsh-tools'
 import { LearnLoopDomainError, payloadHash } from './domain.js'
 import type { StateTable, VerifiedTaskAssessment } from './types.js'
 import { activeProject, assessCurrentCandidate, workspaceForSession } from './workspace.js'
+import {finalizeLearnLoopToolError} from './tool-protocol.js'
 import { resolveCandidateProvenance, type CandidateSessionReader } from './evidence-bridge.js'
 
 export interface VerifierHeader {
@@ -26,7 +27,8 @@ export function createLearnLoopAssessmentTool(table: StateTable, sessions: Verif
       misconceptions: { type: 'array', required: true, items: { type: 'string' } },
       feedback: { type: 'string', required: true },
     },
-    output: { schema: { type: 'object', additionalProperties: false, properties: { status: { type: 'string', const: 'assessed', required: true }, result: { type: 'string', required: true, enum: ['needs-work', 'passed', 'excellent'] }, revision: { type: 'integer', required: true }, candidateId: { type: 'string', required: true }, taskId: { type: 'string', required: true }, taskCompleted: { type: 'boolean', required: true }, failedCriteria: { type: 'array', required: true, items: { type: 'integer' } }, feedback: { type: 'string', required: true } } }, render: (_args, value) => [{ type: 'text', text: value.taskCompleted ? 'The task passed.' : 'The task needs more work.' }] },
+    output: { schema: { type: 'object', additionalProperties: false, properties: { status: { type: 'string', const: 'assessed', required: true }, result: { type: 'string', required: true, enum: ['needs-work', 'passed', 'excellent'] }, candidateId: { type: 'string', required: true }, taskId: { type: 'string', required: true }, taskCompleted: { type: 'boolean', required: true }, failedCriteria: { type: 'array', required: true, items: { type: 'integer' } }, feedback: { type: 'string', required: true } } }, render: (_args, value) => [{ type: 'text', text: value.taskCompleted ? 'The task passed.' : 'The task needs more work.' }] },
+    finalizeContent: finalizeLearnLoopToolError,
     async execute(args, exec) {
       if (!exec.agent) throw new LearnLoopDomainError('SESSION_MISMATCH', 'Agent required.')
       const sessionId = String(exec.agent.id)
@@ -41,7 +43,7 @@ export function createLearnLoopAssessmentTool(table: StateTable, sessions: Verif
         if (receipt.action !== 'evidence:assess' || receipt.payloadHash !== fingerprint) throw new LearnLoopDomainError('IDEMPOTENCY_KEY_REUSED', 'Assessment call id was reused with different content.')
         if (!receipt.result || receipt.result.kind !== 'assessment-settled') throw new LearnLoopDomainError('ASSESSMENT_INVALID', 'Canonical assessment receipt is missing.')
         const result = receipt.result
-        return { status: 'assessed' as const, result: result.result, revision: result.workspaceRevision, candidateId: result.candidateId, taskId: result.taskId, taskCompleted: result.taskCompleted, failedCriteria: result.failedCriteria, feedback: result.feedback }
+        return { status: 'assessed' as const, result: result.result, candidateId: result.candidateId, taskId: result.taskId, taskCompleted: result.taskCompleted, failedCriteria: result.failedCriteria, feedback: result.feedback }
       }
       const prior = project.assessments.find(item => item.verifier.toolCallId === exec.callId)
       const candidate = project.evidenceCandidates.find(item => item.id === (project.execution?.candidateId ?? prior?.candidateId))
@@ -53,7 +55,7 @@ export function createLearnLoopAssessmentTool(table: StateTable, sessions: Verif
       const updated = await table.update('singleton', state => assessCurrentCandidate(state, { sessionId, idempotencyKey, ...args, verifier, provenance }))
       const result = updated.commandReceipts.find(item => item.workspaceId === workspace.workspaceId && item.idempotencyKey === idempotencyKey)?.result
       if (!result || result.kind !== 'assessment-settled') throw new LearnLoopDomainError('ASSESSMENT_INVALID', 'Canonical assessment receipt is missing.')
-      return { status: 'assessed' as const, result: result.result, revision: result.workspaceRevision, candidateId: result.candidateId, taskId: result.taskId, taskCompleted: result.taskCompleted, failedCriteria: result.failedCriteria, feedback: result.feedback }
+      return { status: 'assessed' as const, result: result.result, candidateId: result.candidateId, taskId: result.taskId, taskCompleted: result.taskCompleted, failedCriteria: result.failedCriteria, feedback: result.feedback }
     },
   })
 }

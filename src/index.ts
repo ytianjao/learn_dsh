@@ -8,7 +8,7 @@ import type {} from '@deepseek-ai/dsh-workspace'
 import { emptyState, ensureState, learnLoopDomainSpec } from './domain.js'
 import { API_PATH, EXPORT_PATH, MANAGE_PATH, createLearnLoopHttpHandler } from './http.js'
 import type { StateTable } from './types.js'
-import { createLearnLoopApprovePlanTool, createLearnLoopBeginOnboardingTool, createLearnLoopCommitProfileTool, createLearnLoopConfirmProfileTool, createLearnLoopCreatePlanDraftTool, createLearnLoopRequestPlanRevisionTool } from './tool.js'
+import { createLearnLoopApprovePlanTool, createLearnLoopCommitProfileTool, createLearnLoopConfirmProfileTool, createLearnLoopCreatePlanDraftTool, createLearnLoopRequestPlanRevisionTool } from './tool.js'
 import { createLearnLoopAssessmentTool } from './assessment-tool.js'
 import { renderLearnLoopSystemSection } from './prompt.js'
 import { capturePreStepAnswer, enrichCandidateEvent, type AuthoritativeUserMessage } from './evidence-bridge.js'
@@ -19,6 +19,7 @@ export * from './domain.js'
 export * from './http.js'
 export * from './types.js'
 export * from './tool.js'
+export * from './tool-protocol.js'
 export * from './prompt.js'
 export * from './assessment-tool.js'
 export * from './evidence-bridge.js'
@@ -34,7 +35,6 @@ export async function apply(ctx: Context): Promise<void> {
   await ensureState(table)
   const workspaceResolver = (sessionId: string, claim?: string) => resolveCanonicalWorkspace(ctx.workspaceRegistry, sessionId, claim)
   ctx.effect(() => ctx.systemPrompt.section({ name: 'learnloop-runtime', order: 50, text: context => renderLearnLoopSystemSection(table.get('singleton') ?? emptyState(), context.agent?.id) }), 'learnloop.systemPrompt()')
-  ctx.effect(() => ctx.tools.register(createLearnLoopBeginOnboardingTool(table, workspaceResolver)), 'learnloop.beginOnboardingTool()')
   ctx.effect(() => ctx.tools.register(createLearnLoopCommitProfileTool(table, workspaceResolver)), 'learnloop.commitProfileTool()')
   ctx.effect(() => ctx.tools.register(createLearnLoopConfirmProfileTool(table, workspaceResolver)), 'learnloop.confirmProfileTool()')
   ctx.effect(() => ctx.tools.register(createLearnLoopCreatePlanDraftTool(table, workspaceResolver)), 'learnloop.createPlanDraftTool()')

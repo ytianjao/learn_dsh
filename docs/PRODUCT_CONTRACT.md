@@ -95,3 +95,11 @@ The Host compiles UUID identities, a deterministic linear dependency chain, pend
 and a draft plan atomically. Current verification is text-only. Artifact/file/repository
 verification is not supported in the current canonical contract. Legacy state and contracts
 are rejected rather than migrated or silently reset.
+
+## Current LearnLoop interaction protocol
+
+Activation is Host-owned: button → HTTP `begin-learning-mode` → `interviewing` Project → visible learner intent. The agent interviews, commits and obtains explicit Profile confirmation, creates a Draft Plan, and asks the learner to **确认并启用计划 / Confirm and activate plan**. After confirmation the Plan is active, execution is null, and all Tasks remain pending. Teaching starts only after the learner explicitly starts the first Task in LearnLoop. LearnLoop phase policy and domain guards reject wrong-phase model calls with `INVALID_PROJECT_PHASE`; model-visible outputs use semantic fields such as `profileRevision`, `planId`, and `planVersion`, never a generic workspace revision.
+
+### Upstream rc.8 limitations
+
+DSH rc.8 exposes registered tools globally and has no public request-time callback for filtering them from an external Project phase. Its public `ToolRunContext` also has no `userQuestions.ask()` or nested native-question dispatch service; `ask_user_question` is an upstream tool, and an empty `selected: []` does not distinguish dismissal, cancellation, and no selection. LearnLoop therefore does not fabricate those distinctions or claim a durable native-question retry wrapper: it enforces phase safety through the exact prompt allow-list, executor/domain guards, and chat fallback policy. A future wrapper requires a public upstream question service.
