@@ -85,9 +85,9 @@ Verified Answer Loop v1 accepts text only. It does not automatically verify imag
 
 ## Canonical persistence boundary (0.2.0)
 
-Schema 5 stores business data only at `workspaces[workspaceId].projects[projectId]`. Projects independently own profile, plans, execution, candidates, verified evidence and assessments, mastery, adjustments, and review state. `activeSessionId` is an execution attachment, not ownership. API v2 reads by Workspace; storage unit 2 rejects earlier LearnLoop states. No code automatically resets or deletes DSH data.
+Schema 8 stores business data only at `workspaces[workspaceId].projects[projectId]`. Projects independently own profile, plans, execution, candidates, verified evidence and assessments, mastery, adjustments, and review state. `activeSessionId` is an execution attachment, not ownership. API v3 reads by Workspace; storage domain 5 rejects earlier LearnLoop states. No code automatically resets or deletes DSH data.
 
-## Canonical Plan Intent contract (0.4.0)
+## Canonical Plan Intent contract (0.5.0)
 
 Models submit only ordered stages with learner-visible title/outcome and tasks containing
 `title`, `objective`, `activity`, `acceptanceCriteria`, `checkPrompt`, and `estimateMinutes`.
@@ -102,4 +102,14 @@ Activation is Host-owned: button → HTTP `begin-learning-mode` → `interviewin
 
 ### Upstream rc.8 limitations
 
-DSH rc.8 exposes registered tools globally and has no public request-time callback for filtering them from an external Project phase. Its public `ToolRunContext` also has no `userQuestions.ask()` or nested native-question dispatch service; `ask_user_question` is an upstream tool, and an empty `selected: []` does not distinguish dismissal, cancellation, and no selection. LearnLoop therefore does not fabricate those distinctions or claim a durable native-question retry wrapper: it enforces phase safety through the exact prompt allow-list, executor/domain guards, and chat fallback policy. A future wrapper requires a public upstream question service.
+DSH rc.8 exposes Agent-scoped `agent.ctx.tools.restrict({ deny })` and `guard()`. LearnLoop derives one phase policy and applies an exact deny-list to its own model tools and `ask_user_question`; this changes both request schemas and execution while leaving unrelated Host tools untouched. Domain phase guards remain authoritative. The public `ToolRunContext` has no nested native-question dispatch service, so LearnLoop does not fabricate question-result semantics.
+
+## Unified learning action and phase capabilities (0.5.0)
+
+Task execution has one primary entry in the conversation composer. The plan view is read-only for task execution: it presents stages, task state, Evidence, and Mastery without start/check/pause/resume/skip controls. `derivePrimaryLearningAction` maps Project, Session, and execution state to the only current action.
+
+The phase policy permits profile commit while interviewing; profile commit/confirmation/preference revision in profile review; plan draft creation and explicit preference revision while planning; plan revision, explicit preference revision, and approval in plan review; and assessment only while awaiting an answer or verifying. Native questions are limited to interviewing, profile review, and plan review. Teaching and needs-revision prohibit shadow quizzes.
+
+Preference revision is learner-initiated, increments the Profile revision, clears confirmation, archives a draft, and returns to profile review. Plan validation otherwise repairs Plan Intent within confirmed constraints. A general request for relevant industry examples remains `standard`; `high` requires explicit dense or every-stage wording.
+
+Command receipts store canonical Profile commit/confirmation/preference-revision and Plan approval results before later phase validation, so exact retries replay after phase advancement. Activation uses a per-click `activationAttemptId`; one network retry reuses it, while a new activation after clear creates a new attempt.

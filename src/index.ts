@@ -8,7 +8,8 @@ import type {} from '@deepseek-ai/dsh-workspace'
 import { emptyState, ensureState, learnLoopDomainSpec } from './domain.js'
 import { API_PATH, EXPORT_PATH, MANAGE_PATH, createLearnLoopHttpHandler } from './http.js'
 import type { StateTable } from './types.js'
-import { createLearnLoopApprovePlanTool, createLearnLoopCommitProfileTool, createLearnLoopConfirmProfileTool, createLearnLoopCreatePlanDraftTool, createLearnLoopRequestPlanRevisionTool } from './tool.js'
+import { createLearnLoopApprovePlanTool, createLearnLoopCommitProfileTool, createLearnLoopConfirmProfileTool, createLearnLoopCreatePlanDraftTool, createLearnLoopRequestPlanRevisionTool, createLearnLoopReviseProfilePreferencesTool } from './tool.js'
+import {LearnLoopToolRestrictions} from './tool-restriction.js'
 import { createLearnLoopAssessmentTool } from './assessment-tool.js'
 import { renderLearnLoopSystemSection } from './prompt.js'
 import { capturePreStepAnswer, enrichCandidateEvent, type AuthoritativeUserMessage } from './evidence-bridge.js'
@@ -37,6 +38,7 @@ export async function apply(ctx: Context): Promise<void> {
   ctx.effect(() => ctx.systemPrompt.section({ name: 'learnloop-runtime', order: 50, text: context => renderLearnLoopSystemSection(table.get('singleton') ?? emptyState(), context.agent?.id) }), 'learnloop.systemPrompt()')
   ctx.effect(() => ctx.tools.register(createLearnLoopCommitProfileTool(table, workspaceResolver)), 'learnloop.commitProfileTool()')
   ctx.effect(() => ctx.tools.register(createLearnLoopConfirmProfileTool(table, workspaceResolver)), 'learnloop.confirmProfileTool()')
+  ctx.effect(() => ctx.tools.register(createLearnLoopReviseProfilePreferencesTool(table, workspaceResolver)), 'learnloop.reviseProfilePreferencesTool()')
   ctx.effect(() => ctx.tools.register(createLearnLoopCreatePlanDraftTool(table, workspaceResolver)), 'learnloop.createPlanDraftTool()')
   ctx.effect(() => ctx.tools.register(createLearnLoopRequestPlanRevisionTool(table, workspaceResolver)), 'learnloop.requestPlanRevisionTool()')
   ctx.effect(() => ctx.tools.register(createLearnLoopApprovePlanTool(table, workspaceResolver)), 'learnloop.approvePlanTool()')
@@ -74,7 +76,15 @@ export async function apply(ctx: Context): Promise<void> {
     if (event.type !== 'user/message') return
     eventWrites = eventWrites.then(() => table.update('singleton', state => enrichCandidateEvent(state, String(session.id), event.data, event.seq))).then(() => undefined, error => { ctx.logger('learnloop').error(error, 'Failed to enrich candidate provenance') })
   })
-  const handler = createLearnLoopHttpHandler(table, sessionReader, workspaceResolver)
+  const restrictions=new LearnLoopToolRestrictions(new Set(ctx.tools.schemas().map(schema=>schema.name)))
+  const sync=(state=table.get('singleton')??emptyState(),sessionIds?:readonly string[])=>{for(const agent of ctx.agents.list())if(!sessionIds||sessionIds.includes(String(agent.id)))restrictions.sync(agent,state)}
+  ctx.on('agent/created',({agent})=>restrictions.sync(agent,table.get('singleton')??emptyState()))
+  ctx.on('agent/session-start',({agent})=>restrictions.sync(agent,table.get('singleton')??emptyState()))
+  ctx.on('agent/disposed',({agent})=>restrictions.dispose(String(agent.id)))
+  ctx.on('tools/result',(exec)=>{if(exec.agent&&exec.name.startsWith('learnloop_'))restrictions.sync(exec.agent,table.get('singleton')??emptyState())})
+  sync()
+  ctx.effect(()=>()=>restrictions.disposeAll(),'learnloop.toolRestrictions()')
+  const handler = createLearnLoopHttpHandler(table, sessionReader, workspaceResolver,(state,sessions)=>sync(state,sessions))
   ctx.effect(() => ctx.webServer.register({ kind: 'exact', path: API_PATH, handler }), 'learnloop.stateRoute()')
   ctx.effect(() => ctx.webServer.register({ kind: 'exact', path: EXPORT_PATH, handler }), 'learnloop.exportRoute()')
   ctx.effect(() => ctx.webServer.register({ kind: 'exact', path: MANAGE_PATH, handler }), 'learnloop.manageRoute()')
