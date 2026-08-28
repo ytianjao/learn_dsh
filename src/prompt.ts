@@ -1,5 +1,5 @@
 import type { LearnLoopState } from './types.js'
-import { nextAction } from './workspace.js'
+import { nextAction, resolveSessionWorkspace } from './workspace.js'
 
 const policies: Record<string, string> = {
   interviewing: 'Interview the learner using the Host-native ask_user_question. Ask one core question at a time; never invent background. When sufficient, call learnloop_commit_profile and put unknowns in unansweredQuestions. Do not create a plan.',
@@ -17,8 +17,10 @@ const policies: Record<string, string> = {
 
 export function renderLearnLoopSystemSection(state: LearnLoopState, agentId: string | undefined) {
   if (!agentId) return ''
-  const workspace = Object.values(state.workspaces).find(item => item.activeSessionId === agentId)
-  if (!workspace?.activeProjectId) return ''
+  const resolution = resolveSessionWorkspace(state, agentId)
+  if (resolution.kind !== 'resolved') return ''
+  const workspace = resolution.workspace
+  if (!workspace.activeProjectId) return ''
   const project = workspace.projects[workspace.activeProjectId]
   if (!project) return ''
   const plan = project.plans.find(item => item.id === project.activePlanId) ?? project.plans.at(-1)
