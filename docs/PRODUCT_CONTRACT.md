@@ -1,5 +1,9 @@
 # 产品契约 / Product contract
 
+> Runtime baseline: all directly consumed Harness packages are pinned to the single
+> `0.1.1-rc.2` family recorded in `scripts/dsh-baseline.json`. This maintenance upgrade does
+> not change LearnLoop state schema, product fields, or HTTP API v3.
+
 ## 产品边界 / Product boundary
 
 DSH 负责会话、流式 Chat、模型路由和凭据；LearnLoop 负责学习项目、计划、证据、掌握度、复盘和调整事实。LearnLoop 不实现模型提供商客户端。

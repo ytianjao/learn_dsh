@@ -1,5 +1,12 @@
 # 变更日志 / Changelog
 
+## Unreleased — DSH compatibility
+
+- Upgraded every directly used Harness package to the exact `0.1.1-rc.2` release family.
+- Centralized the official release commit in `scripts/dsh-baseline.json` and migrated
+  assessment provenance to public typed Session events in a fail-closed adapter.
+- Removed the rc.8 ask-user patch and local System Prompt typing workaround.
+
 ## 0.2.0
 
 - Breaking: removed support for pre-canonical LearnLoop persisted states and backup format 1.

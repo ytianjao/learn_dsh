@@ -18,11 +18,16 @@ jobs:
     steps:
       - name: Check out LearnLoop
         uses: actions/checkout@v5
+      - name: Read DSH baseline
+        id: baseline
+        run: |
+          echo "version=$(node -p \"require('./scripts/dsh-baseline.json').version\")" >> "$GITHUB_OUTPUT"
+          echo "commit=$(node -p \"require('./scripts/dsh-baseline.json').commit\")" >> "$GITHUB_OUTPUT"
       - name: Check out pinned DeepSeek Harness source
         uses: actions/checkout@v5
         with:
           repository: deepseek-ai/deepseek-harness
-          ref: 141eb6fef83422698aef7a981029e843e8161534
+          ref: ${{ steps.baseline.outputs.commit }}
           path: dsh-source
       - uses: pnpm/action-setup@v4
         with:
@@ -32,6 +37,13 @@ jobs:
         with:
           node-version: 22.19.0
           cache: pnpm
+      - name: Print compatibility baseline
+        run: |
+          echo "LearnLoop commit: $(git rev-parse HEAD)"
+          echo "DSH version: ${{ steps.baseline.outputs.version }}"
+          echo "DSH commit: ${{ steps.baseline.outputs.commit }}"
+          echo "Node version: $(node --version)"
+          echo "pnpm version: $(pnpm --version)"
       - name: Install LearnLoop and DSH dependencies
         run: |
           pnpm install --frozen-lockfile
@@ -80,8 +92,8 @@ jobs:
       - name: Stop background services
         if: always()
         run: |
-          test ! -f dsh-web.pid || kill "$(cat dsh-web.pid)" 2>/dev/null || true
-          test ! -f mock-provider.pid || kill "$(cat mock-provider.pid)" 2>/dev/null || true
+          if test -f dsh-web.pid; then kill "$(cat dsh-web.pid)" 2>/dev/null || test $? -eq 1; fi
+          if test -f mock-provider.pid; then kill "$(cat mock-provider.pid)" 2>/dev/null || test $? -eq 1; fi
       - name: Upload browser reports, screenshots, traces, and logs
         if: always()
         uses: actions/upload-artifact@v5

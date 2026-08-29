@@ -1,5 +1,8 @@
 # 网页验收 / Web acceptance
 
+The keyless browser lane checks out the immutable Harness commit from
+`scripts/dsh-baseline.json`; it never follows `master` or contacts a real model endpoint.
+
 ## 自动验收 / Automated acceptance
 
 1. 启动固定 DSH Web fixture 并设置 `DSH_WEB_URL` / Start the pinned DSH Web fixture and set `DSH_WEB_URL`.

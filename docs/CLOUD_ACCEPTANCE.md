@@ -4,8 +4,8 @@
 
 | 项目 / Item | 固定值 / Pin |
 | --- | --- |
-| DeepSeek Harness | `@deepseek-ai/dsh@0.1.0-rc.8` |
-| Upstream commit / 上游提交 | `141eb6fef83422698aef7a981029e843e8161534` |
+| DeepSeek Harness | `@deepseek-ai/dsh@0.1.1-rc.2` |
+| Upstream commit / 上游提交 | `b150a551b8d465e31e418e1b2eaf5e79bbb7d28e` |
 | Node | `22.19.0`（DSH 支持 `^22.19.0 || >=24.0.0`） |
 | pnpm | `11.7.0` |
 | Plugin install / 插件安装 | `dsh plugin --profile web add <checkout>` |

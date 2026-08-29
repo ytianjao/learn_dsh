@@ -7,6 +7,3 @@ allowBuilds:
   koffi: true
   node-pty: true
   protobufjs: true
-
-patchedDependencies:
-  '@deepseek-ai/dsh-tool-ask-user@0.1.0-rc.8': patches/@deepseek-ai__dsh-tool-ask-user@0.1.0-rc.8.patch

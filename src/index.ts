@@ -12,8 +12,9 @@ import { createLearnLoopApprovePlanTool, createLearnLoopCommitProfileTool, creat
 import {LearnLoopToolRestrictions} from './tool-restriction.js'
 import { createLearnLoopAssessmentTool } from './assessment-tool.js'
 import { renderLearnLoopSystemSection } from './prompt.js'
-import { capturePreStepAnswer, enrichCandidateEvent, type AuthoritativeUserMessage } from './evidence-bridge.js'
+import { capturePreStepAnswer, enrichCandidateEvent } from './evidence-bridge.js'
 import { resolveCanonicalWorkspace } from './workspace-identity.js'
+import {createDshSessionReader} from './dsh-session-adapter.js'
 
 export * from './workspace-identity.js'
 export * from './domain.js'
@@ -26,6 +27,7 @@ export * from './assessment-tool.js'
 export * from './evidence-bridge.js'
 export * from './workspace.js'
 export * from './plan-intent.js'
+export * from './dsh-session-adapter.js'
 
 export const name = 'learnloop'
 export const inject = ['storageDomain', 'webServer', 'tools', 'systemPrompt', 'agents', 'sessions', 'workspaceRegistry']
@@ -35,40 +37,14 @@ export async function apply(ctx: Context): Promise<void> {
   const table = domain.table('state') as StateTable
   await ensureState(table)
   const workspaceResolver = (sessionId: string, claim?: string) => resolveCanonicalWorkspace(ctx.workspaceRegistry, sessionId, claim)
-  ctx.effect(() => ctx.systemPrompt.section({ name: 'learnloop-runtime', order: 50, text: context => renderLearnLoopSystemSection(table.get('singleton') ?? emptyState(), context.agent?.id) }), 'learnloop.systemPrompt()')
+  ctx.effect(() => ctx.systemPrompt.section({ name: 'learnloop-runtime', order: 50, text: context => renderLearnLoopSystemSection(table.get('singleton') ?? emptyState(), context.scope === undefined ? undefined : String(context.scope)) }), 'learnloop.systemPrompt()')
   ctx.effect(() => ctx.tools.register(createLearnLoopCommitProfileTool(table, workspaceResolver)), 'learnloop.commitProfileTool()')
   ctx.effect(() => ctx.tools.register(createLearnLoopConfirmProfileTool(table, workspaceResolver)), 'learnloop.confirmProfileTool()')
   ctx.effect(() => ctx.tools.register(createLearnLoopReviseProfilePreferencesTool(table, workspaceResolver)), 'learnloop.reviseProfilePreferencesTool()')
   ctx.effect(() => ctx.tools.register(createLearnLoopCreatePlanDraftTool(table, workspaceResolver)), 'learnloop.createPlanDraftTool()')
   ctx.effect(() => ctx.tools.register(createLearnLoopRequestPlanRevisionTool(table, workspaceResolver)), 'learnloop.requestPlanRevisionTool()')
   ctx.effect(() => ctx.tools.register(createLearnLoopApprovePlanTool(table, workspaceResolver)), 'learnloop.approvePlanTool()')
-  const sessionReader = {
-    tailSeq: (id: string) => ctx.sessions.list().find(item => String(item.id) === id)?.seq ?? null,
-    requestHeader: (id: string, callId: string) => {
-      const session = ctx.sessions.list().find(item => String(item.id) === id)
-      if (!session) return null
-      const events = session.events as readonly any[]
-      const calls = events.filter(event => event.type === 'tool/call' && String(event.data.callId) === callId)
-      if (calls.length !== 1) return null
-      const call = calls[0]!
-      if (call.data.name !== 'learnloop_assess_answer') return null
-      const assistants = events.filter(event => event.type === 'assistant/message' && event.data.turn === call.data.turn && event.data.step === call.data.step && event.data.message.content.some((block: any) => block.type === 'tool-call' && String(block.id) === callId))
-      if (assistants.length !== 1) return null
-      const start = events.find(event => event.type === 'step/start' && event.data.turn === call.data.turn && event.data.step === call.data.step)
-      if (!start) return null
-      const headerEvent = events.filter(event => event.type === 'request/header' && event.seq > start.seq && event.seq < assistants[0]!.seq).at(-1)
-      if (!headerEvent || headerEvent.type !== 'request/header') return null
-      return { provider: headerEvent.data.header.config.provider, model: headerEvent.data.header.config.model, seq: headerEvent.seq, assistantMessageEventSeq: assistants[0]!.seq, turn: call.data.turn, step: call.data.step }
-    },
-    userMessages: (id: string, messageIds: readonly string[]) => {
-      const session = ctx.sessions.list().find(item => String(item.id) === id)
-      if (!session) return null
-      const wanted = new Set(messageIds)
-      const found: AuthoritativeUserMessage[] = []
-      for (const event of session.events) if (event.type === 'user/message' && event.data.source.kind === 'user' && wanted.has(String(event.data.id))) found.push({ seq: event.seq, message: event.data })
-      return found
-    },
-  }
+  const sessionReader=createDshSessionReader(ctx.sessions)
   ctx.effect(() => ctx.tools.register(createLearnLoopAssessmentTool(table, sessionReader)), 'learnloop.assessmentTool()')
   ctx.on('agent/pre-step', (payload, next) => capturePreStepAnswer(table, String(payload.agent.id), payload.signal, next))
   let eventWrites = Promise.resolve()
