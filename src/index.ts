@@ -76,8 +76,11 @@ export async function apply(ctx: Context): Promise<void> {
     if (event.type !== 'user/message') return
     eventWrites = eventWrites.then(() => table.update('singleton', state => enrichCandidateEvent(state, String(session.id), event.data, event.seq))).then(() => undefined, error => { ctx.logger('learnloop').error(error, 'Failed to enrich candidate provenance') })
   })
-  const restrictions=new LearnLoopToolRestrictions(new Set(ctx.tools.schemas().map(schema=>schema.name)))
-  const sync=(state=table.get('singleton')??emptyState(),sessionIds?:readonly string[])=>{for(const agent of ctx.agents.list())if(!sessionIds||sessionIds.includes(String(agent.id)))restrictions.sync(agent,state)}
+  const restrictions=new LearnLoopToolRestrictions()
+  let syncing=false,scheduled=false
+  const sync=(state=table.get('singleton')??emptyState(),sessionIds?:readonly string[])=>{syncing=true;try{for(const agent of ctx.agents.list())if(!sessionIds||sessionIds.includes(String(agent.id)))restrictions.sync(agent,state)}finally{syncing=false}}
+  const scheduleSync=()=>{if(syncing||scheduled)return;scheduled=true;queueMicrotask(()=>{scheduled=false;sync()})}
+  ctx.on('tools/change',scheduleSync)
   ctx.on('agent/created',({agent})=>restrictions.sync(agent,table.get('singleton')??emptyState()))
   ctx.on('agent/session-start',({agent})=>restrictions.sync(agent,table.get('singleton')??emptyState()))
   ctx.on('agent/disposed',({agent})=>restrictions.dispose(String(agent.id)))
