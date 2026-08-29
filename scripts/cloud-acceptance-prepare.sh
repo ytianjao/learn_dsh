@@ -14,6 +14,9 @@ run_dsh() {
 }
 
 cd "$REPO_ROOT"
+node -e "const b=require('./scripts/dsh-baseline.json'); console.log('DSH version:',b.version); console.log('DSH commit:',b.commit)"
+printf 'LearnLoop commit: %s\nNode version: %s\npnpm version: %s\n' "$(git rev-parse HEAD)" "$(node --version)" "$(pnpm --version)"
+pnpm run verify:dsh-baseline
 printf 'Using isolated DSH_HOME: %s\n' "$DSH_HOME"
 printf 'Building LearnLoop without a model request...\n'
 pnpm run build

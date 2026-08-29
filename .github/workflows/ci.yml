@@ -15,6 +15,12 @@ jobs:
       - uses: actions/setup-node@v5
         with: {node-version: 22.19.0, cache: pnpm}
       - run: pnpm install --frozen-lockfile
+      - run: |
+          echo "LearnLoop commit: $(git rev-parse HEAD)"
+          node -e "const b=require('./scripts/dsh-baseline.json'); console.log('DSH version:',b.version); console.log('DSH commit:',b.commit)"
+          echo "Node version: $(node --version)"
+          echo "pnpm version: $(pnpm --version)"
+      - run: pnpm run verify:dsh-baseline
       - run: pnpm run build
       - run: pnpm run typecheck
   lint:
