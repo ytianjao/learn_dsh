@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { activeProject, approveWorkspacePlan, beginWorkspaceOnboarding, commitWorkspaceProfile, compilePlanIntent, confirmWorkspaceProfile, createPlanDraftFromIntent, emptyState, requestPlanDraftRevision, validatePlanIntent, workspaceOf } from '../src/index.js'
+import {completeProfileInterviewFixture, activeProject, approveWorkspacePlan, beginWorkspaceOnboarding, commitWorkspaceProfile, compilePlanIntent, confirmWorkspaceProfile, createPlanDraftFromIntent, emptyState, requestPlanDraftRevision, validatePlanIntent, workspaceOf } from '../src/index.js'
 
 const intent = { stages: [{ title: 'Foundations', outcome: 'Understand boundaries.', tasks: [
   { title: 'Explain state', objective: 'Explain the boundary.', activity: 'explain' as const, acceptanceCriteria: ['Explain global state.'], checkPrompt: 'Explain the boundary.', estimateMinutes: 30 },
@@ -8,7 +8,7 @@ const intent = { stages: [{ title: 'Foundations', outcome: 'Understand boundarie
 function planning() {
   let state = beginWorkspaceOnboarding(emptyState(), { workspaceId: 'ws', sessionId: 'session', expectedRevision: 0, idempotencyKey: 'begin' })
   const projectId = workspaceOf(state, 'ws').activeProjectId!
-  state = commitWorkspaceProfile(state, { workspaceId: 'ws', projectId, sessionId: 'session', expectedRevision: 1, idempotencyKey: 'profile', goal: 'Learn', priorKnowledge: '', experienceLevel: 'beginner', knowledgeGaps: [], learningMode: 'balanced', practiceCapacity: 'none', weeklyHours: 4, constraints: [], successCriteria: ['Explain'], unansweredQuestions: [] })
+  state = completeProfileInterviewFixture(state, 'ws'); state = commitWorkspaceProfile(state, { workspaceId: 'ws', projectId, sessionId: 'session', expectedRevision: 1, idempotencyKey: 'profile', goal: 'Learn', targetOutcome:'Target outcome', priorKnowledge: '', experienceLevel: 'beginner', knowledgeGaps: [], learningMode: 'balanced', practiceCapacity: 'none', weeklyHours: 4, constraints: [], successCriteria: ['Explain'], unansweredQuestions: [] })
   return confirmWorkspaceProfile(state, { workspaceId: 'ws', projectId, sessionId: 'session', profileRevision: 1, expectedRevision: 2, idempotencyKey: 'confirm' })
 }
 describe('Plan Intent compiler', () => {

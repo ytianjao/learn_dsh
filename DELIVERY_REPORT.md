@@ -15,3 +15,7 @@ Activation is Host-owned: button → HTTP `begin-learning-mode` → `interviewin
 ## Canonical content epoch
 
 Schema 9 / Storage Domain 6 / backup 4 adds explicit teaching source segments, strict file schemas, deterministic content/privacy validation and immutable Host-owned content files. It does not render or export HTML.
+
+## 0.7.0 host-authoritative onboarding
+
+Runtime V4 resolves `AssembleContext.agent.id`, persists a one-topic-at-a-time evidence-backed interview, and moves Profile/Plan approval to explicit LearnLoop UI HTTP actions. Schema 10, Storage Domain 7, and backup 5 are a clean epoch; clear only LearnLoop data. Static HTML publication remains out of scope.

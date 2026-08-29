@@ -70,3 +70,7 @@ Activation is Host-owned: button → HTTP `begin-learning-mode` → `interviewin
 - Established schema 9 content indexes, private source snapshots, canonical lesson documents, generation jobs, AST-based Markdown validation, privacy scanning, and an atomic Host-owned content repository.
 - Storage Domain 6 and backup format 4 form a clean epoch; DSH remains pinned to 0.1.1-rc.2.
 - Static HTML publication, directory selection, ZIP, VitePress, PDF and EPUB remain out of scope.
+
+## 0.7.0 host-authoritative onboarding
+
+Runtime V4 resolves `AssembleContext.agent.id`, persists a one-topic-at-a-time evidence-backed interview, and moves Profile/Plan approval to explicit LearnLoop UI HTTP actions. Schema 10, Storage Domain 7, and backup 5 are a clean epoch; clear only LearnLoop data. Static HTML publication remains out of scope.

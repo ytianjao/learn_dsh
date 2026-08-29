@@ -56,3 +56,7 @@ The **Start learning mode** button is the only activation boundary: the Host cre
 ## Learning content epoch (0.6.0)
 
 State schema 9, Storage Domain 6 and backup format 4 are a clean breaking epoch. Clear only the LearnLoop Storage Domain (or use a fresh isolated `DSH_HOME`); never delete credentials, Sessions, other plugins, or the whole DSH home. LearnLoop stores private source snapshots and canonical lesson JSON below an opaque hashed content path. HTML/static-site export is not included.
+
+## 0.7.0 host-authoritative onboarding
+
+Runtime V4 resolves `AssembleContext.agent.id`, persists a one-topic-at-a-time evidence-backed interview, and moves Profile/Plan approval to explicit LearnLoop UI HTTP actions. Schema 10, Storage Domain 7, and backup 5 are a clean epoch; clear only LearnLoop data. Static HTML publication remains out of scope.
