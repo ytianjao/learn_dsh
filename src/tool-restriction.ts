@@ -5,23 +5,23 @@ import {resolveSessionWorkspace} from './workspace.js'
 
 interface Restriction{fingerprint:string;lift:()=>void}
 
-/** Owns exactly one replaceable restriction/guard pair per live Agent. */
+/** Owns exactly one replaceable, agent-scoped restriction per live Agent. */
 export class LearnLoopToolRestrictions{
  private readonly active=new Map<string,Restriction>()
- constructor(private readonly registeredNames:ReadonlySet<string>){ }
  sync(agent:Agent,state:LearnLoopState){
+  const id=String(agent.id),prior=this.active.get(id)
+  // Lift first: schemas(agent) must observe the complete inherited live registry.
+  prior?.lift();this.active.delete(id)
   const resolution=resolveSessionWorkspace(state,String(agent.id))
   const project=resolution.kind==='resolved'&&resolution.workspace.activeProjectId?resolution.workspace.projects[resolution.workspace.activeProjectId]??null:null
   const policy=deriveAgentToolPolicy(project)
-  const denied:string[]=LEARNLOOP_TOOL_NAMES.filter(name=>this.registeredNames.has(name)&&!policy.allowedLearnLoopTools.includes(name))
-  if(!policy.allowNativeQuestion&&this.registeredNames.has('ask_user_question'))denied.push('ask_user_question')
+  const registeredNames=new Set(agent.ctx.tools.schemas(agent).map(schema=>schema.name))
+  const denied:string[]=LEARNLOOP_TOOL_NAMES.filter(name=>registeredNames.has(name)&&!policy.allowedLearnLoopTools.includes(name))
+  if(!policy.allowNativeQuestion&&registeredNames.has('ask_user_question'))denied.push('ask_user_question')
   const fingerprint=[...denied].sort().join('|')||'unrestricted'
-  const prior=this.active.get(String(agent.id));if(prior?.fingerprint===fingerprint)return
-  prior?.lift()
-  if(!denied.length){this.active.delete(String(agent.id));return}
+  if(!denied.length)return
   const liftRestriction=agent.ctx.tools.restrict({deny:denied})
-  const liftGuard=agent.ctx.tools.guard(exec=>denied.includes(exec.name)?'LearnLoop phase policy denies this tool.':undefined)
-  this.active.set(String(agent.id),{fingerprint,lift:()=>{liftGuard();liftRestriction()}})
+  this.active.set(id,{fingerprint,lift:liftRestriction})
  }
  dispose(sessionId:string){this.active.get(sessionId)?.lift();this.active.delete(sessionId)}
  disposeAll(){for(const item of this.active.values())item.lift();this.active.clear()}

@@ -5,15 +5,16 @@ import type {LearningProject,LearnLoopErrorCode} from './types.js'
 export const LEARNLOOP_TOOL_ERROR_MARKER='LEARNLOOP_TOOL_ERROR_V1'
 export type LearnLoopToolName='learnloop_commit_profile'|'learnloop_confirm_profile'|'learnloop_revise_profile_preferences'|'learnloop_create_plan_draft'|'learnloop_request_plan_revision'|'learnloop_approve_plan'|'learnloop_assess_answer'
 export const LEARNLOOP_TOOL_NAMES:readonly LearnLoopToolName[]=['learnloop_commit_profile','learnloop_confirm_profile','learnloop_revise_profile_preferences','learnloop_create_plan_draft','learnloop_request_plan_revision','learnloop_approve_plan','learnloop_assess_answer']
+export interface LearnLoopToolContract{visibleProjectPhases:readonly string[];visibleExecutionPhases?:readonly string[];executableProjectPhases:readonly string[];executableExecutionPhases?:readonly string[]}
+export const LEARNLOOP_TOOL_CONTRACTS:Readonly<Record<LearnLoopToolName,LearnLoopToolContract>>={
+ learnloop_commit_profile:{visibleProjectPhases:['interviewing','profile_review'],executableProjectPhases:['interviewing','profile_review']},learnloop_confirm_profile:{visibleProjectPhases:['profile_review'],executableProjectPhases:['profile_review']},learnloop_revise_profile_preferences:{visibleProjectPhases:['planning','plan_review'],executableProjectPhases:['planning','plan_review']},learnloop_create_plan_draft:{visibleProjectPhases:['planning'],executableProjectPhases:['planning']},learnloop_request_plan_revision:{visibleProjectPhases:['plan_review'],executableProjectPhases:['plan_review']},learnloop_approve_plan:{visibleProjectPhases:['plan_review'],executableProjectPhases:['plan_review']},learnloop_assess_answer:{visibleProjectPhases:['active'],visibleExecutionPhases:['awaiting-answer','verifying'],executableProjectPhases:['active'],executableExecutionPhases:['verifying']}}
+const contractAllows=(contract:LearnLoopToolContract,project:LearningProject,mode:'visible'|'executable')=>{const projects=mode==='visible'?contract.visibleProjectPhases:contract.executableProjectPhases,executions=mode==='visible'?contract.visibleExecutionPhases:contract.executableExecutionPhases;return projects.includes(project.phase)&&(!executions||executions.includes(project.execution?.phase??''))}
+export const toolAllowed=(name:LearnLoopToolName,project:LearningProject,mode:'visible'|'executable')=>contractAllows(LEARNLOOP_TOOL_CONTRACTS[name],project,mode)
+export const executablePhasesForTool=(name:LearnLoopToolName)=>LEARNLOOP_TOOL_CONTRACTS[name].executableExecutionPhases??LEARNLOOP_TOOL_CONTRACTS[name].executableProjectPhases
 export interface AgentToolPolicy{allowedLearnLoopTools:readonly LearnLoopToolName[];allowNativeQuestion:boolean}
 export function deriveAgentToolPolicy(project:LearningProject|null):AgentToolPolicy{
  if(!project)return{allowedLearnLoopTools:[],allowNativeQuestion:true}
- if(project.phase==='interviewing')return{allowedLearnLoopTools:['learnloop_commit_profile'],allowNativeQuestion:true}
- if(project.phase==='profile_review')return{allowedLearnLoopTools:['learnloop_commit_profile','learnloop_confirm_profile','learnloop_revise_profile_preferences'],allowNativeQuestion:true}
- if(project.phase==='planning')return{allowedLearnLoopTools:['learnloop_create_plan_draft','learnloop_revise_profile_preferences'],allowNativeQuestion:false}
- if(project.phase==='plan_review')return{allowedLearnLoopTools:['learnloop_request_plan_revision','learnloop_revise_profile_preferences','learnloop_approve_plan'],allowNativeQuestion:true}
- if(project.phase==='active'&&['awaiting-answer','verifying'].includes(project.execution?.phase??''))return{allowedLearnLoopTools:['learnloop_assess_answer'],allowNativeQuestion:false}
- return{allowedLearnLoopTools:[],allowNativeQuestion:false}
+ return{allowedLearnLoopTools:LEARNLOOP_TOOL_NAMES.filter(name=>toolAllowed(name,project,'visible')),allowNativeQuestion:['interviewing','profile_review','plan_review'].includes(project.phase)}
 }
 export const allowedLearnLoopToolsForPhase=(project:LearningProject|null)=>deriveAgentToolPolicy(project).allowedLearnLoopTools
 interface SafeToolError{code:string;retryable:boolean;message:string;[key:string]:unknown}
