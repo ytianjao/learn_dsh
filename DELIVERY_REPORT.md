@@ -11,3 +11,7 @@ LearnLoop 0.2.0 removes the runtime compatibility architecture. Commands mutate 
 ## Current LearnLoop interaction protocol
 
 Activation is Host-owned: button → HTTP `begin-learning-mode` → `interviewing` Project → visible learner intent. The agent interviews, commits and obtains explicit Profile confirmation, creates a Draft Plan, and asks the learner to **确认并启用计划 / Confirm and activate plan**. After confirmation the Plan is active, execution is null, and all Tasks remain pending. Teaching starts only after the learner explicitly starts the first Task in LearnLoop. LearnLoop phase policy and domain guards reject wrong-phase model calls with `INVALID_PROJECT_PHASE`; model-visible outputs use semantic fields such as `profileRevision`, `planId`, and `planVersion`, never a generic workspace revision.
+
+## Canonical content epoch
+
+Schema 9 / Storage Domain 6 / backup 4 adds explicit teaching source segments, strict file schemas, deterministic content/privacy validation and immutable Host-owned content files. It does not render or export HTML.

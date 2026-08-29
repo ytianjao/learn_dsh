@@ -1,11 +1,14 @@
 import type {Session,SessionEvent} from '@deepseek-ai/dsh-session'
 import type {AuthoritativeUserMessage} from './evidence-bridge.js'
 import type {VerifierHeader} from './assessment-tool.js'
+import type {LessonSourceMessage,LessonSourceSegment} from './content/schemas.js'
+import {sha256} from './content/hash.js'
 
 export interface LearnLoopSessionReader {
   tailSeq(sessionId:string):number|null
   userMessages(sessionId:string,messageIds:readonly string[]):AuthoritativeUserMessage[]|null
   requestHeader(sessionId:string,toolCallId:string):VerifierHeader|null
+  assistantTextMessagesInSegments(segments:readonly LessonSourceSegment[]):readonly LessonSourceMessage[]|null
 }
 
 interface SessionRegistry { list():readonly Session[] }
@@ -27,6 +30,7 @@ export function createDshSessionReader(sessions:SessionRegistry):LearnLoopSessio
       if(!session)return null
       return findVerifierRequest(session.events,callId)
     },
+    assistantTextMessagesInSegments(segments){const result:LessonSourceMessage[]=[],seen=new Set<string>();for(const segment of segments){if(segment.toInclusiveSeq===null)return null;const session=find(segment.sessionId);if(!session||session.seq<segment.toInclusiveSeq)return null;for(const event of session.events){if(event.seq<=segment.fromExclusiveSeq||event.seq>segment.toInclusiveSeq||event.type!=='assistant/message')continue;const messageId=String(event.data.message.id);if(seen.has(messageId))continue;const text=event.data.message.content.filter((block):block is Extract<typeof block,{type:'text'}>=>block.type==='text').map(block=>block.text).join('\n').replace(/\r\n?/g,'\n').trim();if(!text)continue;seen.add(messageId);result.push({sessionId:segment.sessionId,messageId,eventSeq:event.seq,contentHash:sha256(text),text})}}return result},
   }
 }
 

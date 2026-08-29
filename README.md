@@ -2,7 +2,7 @@
 
 LearnLoop is a local-first learning companion for DSH `0.1.1-rc.2` (baseline `b150a551b8d465e31e418e1b2eaf5e79bbb7d28e`). It requires Node `^22.19.0 || >=24` and pnpm `11.7.0`. LearnLoop never reads or manages model credentials.
 
-## Canonical workspace model (0.2.0)
+## Canonical workspace and content model (0.6.0)
 
 Persisted schema 7 has one root: `schemaVersion`, `revision`, `settings`, `workspaces`, and scoped `commandReceipts`. Each Workspace owns project identities, `activeProjectId`, `activeSessionId`, revision, and events. Each Project aggregate owns its profile, immutable plan versions, execution, candidates, verified assessments and evidence, mastery, adjustments, misconceptions, and review queue. A Session is only the current execution attachment; changing sessions does not move or copy a project.
 
@@ -51,3 +51,8 @@ Workspaces, Sessions, or unrelated plugin data. Restart DSH and enable learning 
 ### Agent protocol
 
 The **Start learning mode** button is the only activation boundary: the Host creates an `interviewing` Project before submitting “开始建立我的学习档案。 / Start building my learning profile.” No onboarding tool is exposed to the model. DSH 0.1.1-rc.2 registers tools globally, so LearnLoop publishes an exact phase allow-list in each system prompt and independently enforces it at the Tool executor/domain boundary. Plan approval activates the plan but leaves every task pending; the learner must explicitly start the first task in LearnLoop.
+
+
+## Learning content epoch (0.6.0)
+
+State schema 9, Storage Domain 6 and backup format 4 are a clean breaking epoch. Clear only the LearnLoop Storage Domain (or use a fresh isolated `DSH_HOME`); never delete credentials, Sessions, other plugins, or the whole DSH home. LearnLoop stores private source snapshots and canonical lesson JSON below an opaque hashed content path. HTML/static-site export is not included.

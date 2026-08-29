@@ -20,9 +20,7 @@ jobs:
         uses: actions/checkout@v5
       - name: Read DSH baseline
         id: baseline
-        run: |
-          echo "version=$(node -p \"require('./scripts/dsh-baseline.json').version\")" >> "$GITHUB_OUTPUT"
-          echo "commit=$(node -p \"require('./scripts/dsh-baseline.json').commit\")" >> "$GITHUB_OUTPUT"
+        run: node scripts/emit-dsh-baseline-outputs.mjs >> "$GITHUB_OUTPUT"
       - name: Check out pinned DeepSeek Harness source
         uses: actions/checkout@v5
         with:

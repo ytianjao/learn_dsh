@@ -1,0 +1,6 @@
+import {describe,expect,it} from 'vitest'
+import {validateMarkdown} from '../src/content/markdown.js'
+import {validateShareableLesson} from '../src/content/privacy.js'
+import type {LessonDocumentIntent} from '../src/content/schemas.js'
+const base={title:'Safe',summary:'Safe',learningObjectives:['Learn'],prerequisites:[],sections:[{kind:'introduction' as const,title:'I',markdown:'Text'},{kind:'concept' as const,title:'C',markdown:'Text'},{kind:'example' as const,title:'E',markdown:'Text'},{kind:'summary' as const,title:'S',markdown:'Text'}],keyTakeaways:['a','b','c'],glossary:[],reviewQuestions:[{question:'a'},{question:'b'}],references:[]}
+describe('content safety',()=>{it.each(['<script>x</script>','![x](https://x.test/a.png)','[x](javascript:alert(1))','[x](file:///tmp/a)','[x](/etc/passwd)'])('rejects unsafe markdown %s',value=>expect(()=>validateMarkdown(value)).toThrow('CONTENT_MARKDOWN_INVALID'));it('accepts GFM without rendering it',()=>expect(validateMarkdown('|a|\n|-|\n|b|')).toContain('|b|'));it('rejects exact private identifiers',()=>expect(()=>validateShareableLesson({...base,summary:'workspace-secret'} as LessonDocumentIntent,['workspace-secret'])).toThrow('CONTENT_PRIVACY_VIOLATION'))})
