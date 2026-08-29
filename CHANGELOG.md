@@ -64,3 +64,9 @@ Invariants: `project.sessionId === mutation.sessionId`; active and blocked curre
 ## Current LearnLoop interaction protocol
 
 Activation is Host-owned: button → HTTP `begin-learning-mode` → `interviewing` Project → visible learner intent. The agent interviews, commits and obtains explicit Profile confirmation, creates a Draft Plan, and asks the learner to **确认并启用计划 / Confirm and activate plan**. After confirmation the Plan is active, execution is null, and all Tasks remain pending. Teaching starts only after the learner explicitly starts the first Task in LearnLoop. LearnLoop phase policy and domain guards reject wrong-phase model calls with `INVALID_PROJECT_PHASE`; model-visible outputs use semantic fields such as `profileRevision`, `planId`, and `planVersion`, never a generic workspace revision.
+
+## 0.6.0 — Canonical learning content
+
+- Established schema 9 content indexes, private source snapshots, canonical lesson documents, generation jobs, AST-based Markdown validation, privacy scanning, and an atomic Host-owned content repository.
+- Storage Domain 6 and backup format 4 form a clean epoch; DSH remains pinned to 0.1.1-rc.2.
+- Static HTML publication, directory selection, ZIP, VitePress, PDF and EPUB remain out of scope.

@@ -9,5 +9,5 @@ for(const name of direct){
   for(const section of ['peerDependencies','devDependencies']) if(pkg[section]?.[name]!==undefined&&pkg[section][name]!==baseline.version) throw new Error(`${section}.${name} must equal ${baseline.version}`)
 }
 if(!lock.includes(`'@deepseek-ai/dsh@${baseline.version}'`)&&!lock.includes(`@deepseek-ai/dsh@${baseline.version}:`)) throw new Error('lockfile does not contain the baseline DSH release')
-if(!workflow.includes('scripts/dsh-baseline.json')) throw new Error('Web E2E must read the baseline manifest')
+if(!workflow.includes('node scripts/emit-dsh-baseline-outputs.mjs >> "$GITHUB_OUTPUT"')) throw new Error('Web E2E must emit validated baseline outputs without nested shell quoting')
 console.log(`DSH baseline verified: ${baseline.version} @ ${baseline.commit}`)
