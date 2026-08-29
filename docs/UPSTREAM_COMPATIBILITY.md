@@ -51,3 +51,7 @@ validation raises `INVALID_ARGS` before the executor. `finalizeContent` receives
 failures and is used to explain an invalid activity path/value/allowed set without retrying or
 rewriting it. The returned Tool definition exposes its canonical schema and validated executor
 as the public testing seam. No upstream code is modified.
+
+## Runtime V4 review boundary
+
+Onboarding uses one persisted interview topic at a time. Profile and Plan review decisions are Host-authoritative UI/HTTP actions; model approval tools are absent. Approval never starts a task.

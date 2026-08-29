@@ -8,11 +8,12 @@ import type {} from '@deepseek-ai/dsh-workspace'
 import { emptyState, ensureState, learnLoopDomainSpec } from './domain.js'
 import { API_PATH, EXPORT_PATH, MANAGE_PATH, createLearnLoopHttpHandler } from './http.js'
 import type { StateTable } from './types.js'
-import { createLearnLoopApprovePlanTool, createLearnLoopCommitProfileTool, createLearnLoopConfirmProfileTool, createLearnLoopCreatePlanDraftTool, createLearnLoopRequestPlanRevisionTool, createLearnLoopReviseProfilePreferencesTool } from './tool.js'
+import { createLearnLoopCommitProfileTool, createLearnLoopCreatePlanDraftTool } from './tool.js'
 import {LearnLoopToolRestrictions} from './tool-restriction.js'
 import { createLearnLoopAssessmentTool } from './assessment-tool.js'
-import { renderLearnLoopSystemSection } from './prompt.js'
+import { renderLearnLoopSystemSection, sessionIdFromAssembleContext } from './prompt.js'
 import { capturePreStepAnswer, enrichCandidateEvent } from './evidence-bridge.js'
+import {recordProfileInterviewAnswer} from './workspace.js'
 import { resolveCanonicalWorkspace } from './workspace-identity.js'
 import {createDshSessionReader} from './dsh-session-adapter.js'
 
@@ -37,13 +38,13 @@ export async function apply(ctx: Context): Promise<void> {
   const table = domain.table('state') as StateTable
   await ensureState(table)
   const workspaceResolver = (sessionId: string, claim?: string) => resolveCanonicalWorkspace(ctx.workspaceRegistry, sessionId, claim)
-  ctx.effect(() => ctx.systemPrompt.section({ name: 'learnloop-runtime', order: 50, text: context => renderLearnLoopSystemSection(table.get('singleton') ?? emptyState(), context.scope === undefined ? undefined : String(context.scope)) }), 'learnloop.systemPrompt()')
+  ctx.effect(() => ctx.systemPrompt.section({ name: 'learnloop-runtime', order: 50, text: context => {
+    const sessionId=sessionIdFromAssembleContext(context)
+    if(!sessionId)ctx.logger('learnloop').debug({code:'PROMPT_AGENT_CONTEXT_MISSING'},'Runtime prompt omitted: agent context missing')
+    return renderLearnLoopSystemSection(table.get('singleton') ?? emptyState(),sessionId)
+  } }), 'learnloop.systemPrompt()')
   ctx.effect(() => ctx.tools.register(createLearnLoopCommitProfileTool(table, workspaceResolver)), 'learnloop.commitProfileTool()')
-  ctx.effect(() => ctx.tools.register(createLearnLoopConfirmProfileTool(table, workspaceResolver)), 'learnloop.confirmProfileTool()')
-  ctx.effect(() => ctx.tools.register(createLearnLoopReviseProfilePreferencesTool(table, workspaceResolver)), 'learnloop.reviseProfilePreferencesTool()')
   ctx.effect(() => ctx.tools.register(createLearnLoopCreatePlanDraftTool(table, workspaceResolver)), 'learnloop.createPlanDraftTool()')
-  ctx.effect(() => ctx.tools.register(createLearnLoopRequestPlanRevisionTool(table, workspaceResolver)), 'learnloop.requestPlanRevisionTool()')
-  ctx.effect(() => ctx.tools.register(createLearnLoopApprovePlanTool(table, workspaceResolver)), 'learnloop.approvePlanTool()')
   const sessionReader=createDshSessionReader(ctx.sessions)
   ctx.effect(() => ctx.tools.register(createLearnLoopAssessmentTool(table, sessionReader)), 'learnloop.assessmentTool()')
   ctx.on('agent/pre-step', (payload, next) => capturePreStepAnswer(table, String(payload.agent.id), payload.signal, next))
@@ -60,7 +61,7 @@ export async function apply(ctx: Context): Promise<void> {
   ctx.on('agent/created',({agent})=>restrictions.sync(agent,table.get('singleton')??emptyState()))
   ctx.on('agent/session-start',({agent})=>restrictions.sync(agent,table.get('singleton')??emptyState()))
   ctx.on('agent/disposed',({agent})=>restrictions.dispose(String(agent.id)))
-  ctx.on('tools/result',(exec)=>{if(exec.agent&&exec.name.startsWith('learnloop_'))restrictions.sync(exec.agent,table.get('singleton')??emptyState())})
+  ctx.on('tools/result',(exec,result)=>{if(!exec.agent)return;if(exec.name==='ask_user_question'&&!result.isError){const value=result.value as {answers?:Array<{id:string;selected?:string[];custom?:string}>},answer=value.answers?.[0];if(answer)eventWrites=eventWrites.then(()=>table.update('singleton',state=>recordProfileInterviewAnswer(state,{sessionId:String(exec.agent!.id),callId:String(exec.callId),questionId:answer.id,selected:answer.selected??[],custom:answer.custom}))).then(state=>{restrictions.sync(exec.agent!,state)},error=>{ctx.logger('learnloop').error(error,'Failed to record interview answer')})}else if(exec.name.startsWith('learnloop_'))restrictions.sync(exec.agent,table.get('singleton')??emptyState())})
   sync()
   ctx.effect(()=>()=>restrictions.disposeAll(),'learnloop.toolRestrictions()')
   const handler = createLearnLoopHttpHandler(table, sessionReader, workspaceResolver,(state,sessions)=>sync(state,sessions))

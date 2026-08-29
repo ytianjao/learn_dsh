@@ -19,9 +19,9 @@ export class LearnLoopToolRestrictions{
   const denied:string[]=LEARNLOOP_TOOL_NAMES.filter(name=>registeredNames.has(name)&&!policy.allowedLearnLoopTools.includes(name))
   if(!policy.allowNativeQuestion&&registeredNames.has('ask_user_question'))denied.push('ask_user_question')
   const fingerprint=[...denied].sort().join('|')||'unrestricted'
-  if(!denied.length)return
   const liftRestriction=agent.ctx.tools.restrict({deny:denied})
-  this.active.set(id,{fingerprint,lift:liftRestriction})
+  const liftGuard=agent.ctx.tools.guard(exec=>{if(exec.name!=='ask_user_question'||project?.phase!=='interviewing')return;const questions=(exec.arguments as {questions?:unknown[]})?.questions??[],topic=project.profileInterview.currentTopic,expectedQuestionId=topic?`learnloop-profile-${topic}`:null;if(questions.length!==1)return `LEARNLOOP_TOOL_ERROR_V1 ${JSON.stringify({code:'INTERVIEW_BATCH_NOT_ALLOWED',currentTopic:topic,receivedQuestionCount:questions.length,expectedQuestionCount:1,expectedQuestionId,nextAction:'Ask exactly the current Topic question.'})}`;const received=(questions[0] as {id?:unknown})?.id;if(received!==expectedQuestionId)return `LEARNLOOP_TOOL_ERROR_V1 ${JSON.stringify({code:'INTERVIEW_TOPIC_MISMATCH',currentTopic:topic,expectedQuestionId,receivedQuestionId:received,nextAction:'Ask only the current Topic.'})}`})
+  this.active.set(id,{fingerprint,lift:()=>{liftGuard();liftRestriction()}})
  }
  dispose(sessionId:string){this.active.get(sessionId)?.lift();this.active.delete(sessionId)}
  disposeAll(){for(const item of this.active.values())item.lift();this.active.clear()}

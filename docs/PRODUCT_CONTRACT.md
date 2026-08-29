@@ -117,3 +117,7 @@ The phase policy permits profile commit while interviewing; profile commit/confi
 Preference revision is learner-initiated, increments the Profile revision, clears confirmation, archives a draft, and returns to profile review. Plan validation otherwise repairs Plan Intent within confirmed constraints. A general request for relevant industry examples remains `standard`; `high` requires explicit dense or every-stage wording.
 
 Command receipts store canonical Profile commit/confirmation/preference-revision and Plan approval results before later phase validation, so exact retries replay after phase advancement. Activation uses a per-click `activationAttemptId`; one network retry reuses it, while a new activation after clear creates a new attempt.
+
+## Runtime V4 review boundary
+
+Onboarding uses one persisted interview topic at a time. Profile and Plan review decisions are Host-authoritative UI/HTTP actions; model approval tools are absent. Approval never starts a task.

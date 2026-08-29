@@ -3,18 +3,20 @@ import type {ToolExecution,ToolExecutionResult} from '@deepseek-ai/dsh-tools'
 import type {LearningProject,LearnLoopErrorCode} from './types.js'
 
 export const LEARNLOOP_TOOL_ERROR_MARKER='LEARNLOOP_TOOL_ERROR_V1'
-export type LearnLoopToolName='learnloop_commit_profile'|'learnloop_confirm_profile'|'learnloop_revise_profile_preferences'|'learnloop_create_plan_draft'|'learnloop_request_plan_revision'|'learnloop_approve_plan'|'learnloop_assess_answer'
-export const LEARNLOOP_TOOL_NAMES:readonly LearnLoopToolName[]=['learnloop_commit_profile','learnloop_confirm_profile','learnloop_revise_profile_preferences','learnloop_create_plan_draft','learnloop_request_plan_revision','learnloop_approve_plan','learnloop_assess_answer']
+export type LearnLoopToolName='learnloop_commit_profile'|'learnloop_create_plan_draft'|'learnloop_assess_answer'
+export const LEARNLOOP_TOOL_NAMES:readonly LearnLoopToolName[]=['learnloop_commit_profile','learnloop_create_plan_draft','learnloop_assess_answer']
 export interface LearnLoopToolContract{visibleProjectPhases:readonly string[];visibleExecutionPhases?:readonly string[];executableProjectPhases:readonly string[];executableExecutionPhases?:readonly string[]}
 export const LEARNLOOP_TOOL_CONTRACTS:Readonly<Record<LearnLoopToolName,LearnLoopToolContract>>={
- learnloop_commit_profile:{visibleProjectPhases:['interviewing','profile_review'],executableProjectPhases:['interviewing','profile_review']},learnloop_confirm_profile:{visibleProjectPhases:['profile_review'],executableProjectPhases:['profile_review']},learnloop_revise_profile_preferences:{visibleProjectPhases:['planning','plan_review'],executableProjectPhases:['planning','plan_review']},learnloop_create_plan_draft:{visibleProjectPhases:['planning'],executableProjectPhases:['planning']},learnloop_request_plan_revision:{visibleProjectPhases:['plan_review'],executableProjectPhases:['plan_review']},learnloop_approve_plan:{visibleProjectPhases:['plan_review'],executableProjectPhases:['plan_review']},learnloop_assess_answer:{visibleProjectPhases:['active'],visibleExecutionPhases:['awaiting-answer','verifying'],executableProjectPhases:['active'],executableExecutionPhases:['verifying']}}
+ learnloop_commit_profile:{visibleProjectPhases:['interviewing'],executableProjectPhases:['interviewing']},
+ learnloop_create_plan_draft:{visibleProjectPhases:['planning'],executableProjectPhases:['planning']},
+ learnloop_assess_answer:{visibleProjectPhases:['active'],visibleExecutionPhases:['awaiting-answer','verifying'],executableProjectPhases:['active'],executableExecutionPhases:['verifying']}}
 const contractAllows=(contract:LearnLoopToolContract,project:LearningProject,mode:'visible'|'executable')=>{const projects=mode==='visible'?contract.visibleProjectPhases:contract.executableProjectPhases,executions=mode==='visible'?contract.visibleExecutionPhases:contract.executableExecutionPhases;return projects.includes(project.phase)&&(!executions||executions.includes(project.execution?.phase??''))}
 export const toolAllowed=(name:LearnLoopToolName,project:LearningProject,mode:'visible'|'executable')=>contractAllows(LEARNLOOP_TOOL_CONTRACTS[name],project,mode)
 export const executablePhasesForTool=(name:LearnLoopToolName)=>LEARNLOOP_TOOL_CONTRACTS[name].executableExecutionPhases??LEARNLOOP_TOOL_CONTRACTS[name].executableProjectPhases
 export interface AgentToolPolicy{allowedLearnLoopTools:readonly LearnLoopToolName[];allowNativeQuestion:boolean}
 export function deriveAgentToolPolicy(project:LearningProject|null):AgentToolPolicy{
  if(!project)return{allowedLearnLoopTools:[],allowNativeQuestion:true}
- return{allowedLearnLoopTools:LEARNLOOP_TOOL_NAMES.filter(name=>toolAllowed(name,project,'visible')),allowNativeQuestion:['interviewing','profile_review','plan_review'].includes(project.phase)}
+ const tools=LEARNLOOP_TOOL_NAMES.filter(name=>toolAllowed(name,project,'visible')).filter(name=>name!=='learnloop_commit_profile'||project.profileInterview.status==='ready-to-draft'); return{allowedLearnLoopTools:tools,allowNativeQuestion:project.phase==='interviewing'&&project.profileInterview.status==='collecting'&&!project.profileInterview.awaitingChatTopic}
 }
 export const allowedLearnLoopToolsForPhase=(project:LearningProject|null)=>deriveAgentToolPolicy(project).allowedLearnLoopTools
 interface SafeToolError{code:string;retryable:boolean;message:string;[key:string]:unknown}
