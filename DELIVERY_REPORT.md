@@ -23,3 +23,7 @@ Runtime V4 resolves `AssembleContext.agent.id`, persists a one-topic-at-a-time e
 ## 0.8.0 adaptive runtime delivery
 
 The Host now evaluates required interview Probes rather than equating one non-empty answer with a Topic. It compiles Profile drafts from learner evidence, while Profile and Plan Views remain the authorization boundary. Tool failures use explicit V2 recovery directives. This delivery does not publish HTML or implement filesystem export selection.
+
+## 0.9.0 learner-first delivery
+
+Runtime V6 separates trusted Host control (`questionToken`, mode, scaffold permission, required Tool) from untrusted learner data. Goal Profile fields are `goalSubject`, `goalIntent`, and `desiredOutcome`; Profile review distinguishes learner text/choice from a conservative Host recommendation. Profile confirmation remains a direct UI action. This delivery does not add Source Capture, lesson generation, Content Jobs, HTML, filesystem selection, ZIP, or VitePress.

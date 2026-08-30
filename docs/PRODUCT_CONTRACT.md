@@ -121,3 +121,10 @@ Command receipts store canonical Profile commit/confirmation/preference-revision
 ## Runtime V4 review boundary
 
 Onboarding uses one persisted interview topic at a time. Profile and Plan review decisions are Host-authoritative UI/HTTP actions; model approval tools are absent. Approval never starts a task.
+
+
+---
+
+# Product Contract
+
+LearnLoop is learner-first: it stores the learner's raw subject before creating planning structure. Internal classifications never become the first question. DSH native custom input is a supported protocol path. Probes express Host information needs rather than a rigid form. Recommendations and learner evidence have distinct origins and remain reviewable. Runtime V6 tokenizes stateful Tool calls and reserves ordinary Chat for explicit Host fallback. Content Runtime and static publishing are out of scope.

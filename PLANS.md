@@ -23,3 +23,7 @@ Runtime V4 resolves `AssembleContext.agent.id`, persists a one-topic-at-a-time e
 ## 0.8.0 runtime boundary
 
 Adaptive onboarding uses required Probes, deterministic Host Profile compilation, direct Plan View approval, and recovery directives. State schema 11 / Storage Domain 8 / backup 6 is a clean epoch. HTML, Static Publisher, Directory Picker, ZIP, and VitePress remain separate future work.
+
+## 0.9.0 interview boundary
+
+The learner's language precedes internal planning structure. A Probe describes an information need, not a fixed questionnaire field. Native custom answers are supported; uncertainty requests a Host scaffold. Tokenized native questions prevent identical stateful Tool calls, and only an explicit Host chat fallback may consume a direct message. Content generation and publication remain separate work.

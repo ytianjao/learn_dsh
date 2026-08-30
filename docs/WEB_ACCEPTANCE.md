@@ -64,3 +64,10 @@ Activation is Host-owned: button → HTTP `begin-learning-mode` → `interviewin
 ## Runtime V4 review boundary
 
 Onboarding uses one persisted interview topic at a time. Profile and Plan review decisions are Host-authoritative UI/HTTP actions; model approval tools are absent. Approval never starts a task.
+
+
+---
+
+# Keyless Web Acceptance
+
+The deterministic provider must read Runtime V6 Host control, visible Tool names, token, mode, scaffold permission, and learner subject. It returns the exact token and, for the quantitative-trading fixture only, five ordered domain options. The Host appends uncertainty. Playwright must use the real custom field and real option click; no state injection or skip is permitted. Preserve `mock-provider.log`, `dsh-web.log`, `fixture-setup.log`, trace, and screenshots as CI artifacts.

@@ -1,0 +1,3 @@
+import {describe,expect,it} from 'vitest'
+import {activeProject,beginWorkspaceOnboarding,compileProfileDraftFromInterview,emptyState,workspaceOf} from '../src/index.js'
+describe('goal compiler origins',()=>{it('does not invent a category or professional capability',()=>{const i=activeProject(workspaceOf(beginWorkspaceOnboarding(emptyState(),{workspaceId:'w',sessionId:'s',expectedRevision:0,idempotencyKey:'b'}),'w')).profileInterview;i.probes['goal.subject'].normalizedValue='想学做饭';i.probes['goal.outcome'].normalizedValue='先简单了解它是什么';const p=compileProfileDraftFromInterview(i,{id:'p',revision:1,createdAt:i.createdAt,updatedAt:i.updatedAt});expect(p.goalKind).toBeNull();expect(p.goal).toBe('想学做饭，并先简单了解它是什么')})})

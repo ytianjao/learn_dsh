@@ -65,3 +65,10 @@ Activation is Host-owned: button → HTTP `begin-learning-mode` → `interviewin
 ## Runtime V4 review boundary
 
 Onboarding uses one persisted interview topic at a time. Profile and Plan review decisions are Host-authoritative UI/HTTP actions; model approval tools are absent. Approval never starts a task.
+
+
+---
+
+# Acceptance Scenarios
+
+The required browser path creates a Workspace and Session, starts learning mode, observes `LEARNLOOP_RUNTIME_V6`, submits `简单了解量化交易系统` through native custom input, and receives domain-specific scaffold options plus the Host-added uncertainty option. Selecting uncertainty records a conservative Host recommendation; selecting the overview option records learner choice. Adjacent Tool arguments contain different question tokens, no identical-call warning occurs, no DeepSeek request is made, and Profile confirmation remains in LearnLoop UI.
