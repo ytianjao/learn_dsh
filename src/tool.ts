@@ -1,14 +1,13 @@
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import { LearnLoopDomainError } from './domain.js'
-import { activeProject, commitWorkspaceProfile, createPlanDraftFromIntent } from './workspace.js'
+import { createPlanDraftFromIntent } from './workspace.js'
 import type { StateTable } from './types.js'
 import type {CanonicalWorkspaceContext} from './workspace-identity.js'
 import {encodeToolError,finalizeLearnLoopToolError} from './tool-protocol.js'
 type WorkspaceResolver=(sessionId:string,claimedWorkspaceId?:string)=>CanonicalWorkspaceContext
-const canonical=(exec:{agent?:{id:unknown}},resolver:WorkspaceResolver,claim?:string)=>{if(!exec.agent)throw new LearnLoopDomainError('WORKSPACE_CONTEXT_MISSING','Tool execution has no DSH Session.');return resolver(String(exec.agent.id),claim)}
 const stringItem={type:'string' as const}
 const text={...stringItem,required:true as const}, integer={type:'integer' as const,required:true as const}
-export function createLearnLoopCommitProfileTool(table:StateTable,resolveWorkspace:WorkspaceResolver){return defineTool({name:'learnloop_commit_profile',description:'Commit only learner-supported structured profile facts. Mentioning relevant or industry examples means standard density plus a note. Use high only for an explicit every-stage, example-dense, or primarily-case-based request. Omit exampleDensity when unstated. Host derives control metadata.',parameters:{goal:text,targetOutcome:text,priorKnowledge:text,experienceLevel:{type:'string',required:true,enum:['beginner','intermediate','advanced']},knowledgeGaps:{type:'array',required:true,items:stringItem},learningMode:{type:'string',required:true,enum:['knowledge-first','balanced','practice-first']},practiceCapacity:{type:'string',required:true,enum:['none','light','full']},explanationDepth:{type:'string',enum:['standard','deep']},exampleDensity:{type:'string',enum:['standard','high']},additionalNotes:{type:'string'},weeklyHours:integer,deadline:{type:'string'},constraints:{type:'array',required:true,items:stringItem},successCriteria:{type:'array',required:true,items:stringItem}},output:{schema:{type:'object',additionalProperties:false,properties:{status:{type:'string',const:'profile-review',required:true},profileRevision:integer}},render:(_a,v)=>[{type:'text',text:`Profile revision ${v.profileRevision} is awaiting explicit learner confirmation.`}]},finalizeContent:finalizeLearnLoopToolError,async execute(args,exec){const identity=canonical(exec,resolveWorkspace,undefined),key=`profile:${exec.callId}`;const updated=await table.update('singleton',state=>{const workspace=state.workspaces[identity.workspaceId]!,project=activeProject(workspace);return commitWorkspaceProfile(state,{...args,workspaceId:identity.workspaceId,projectId:project.id,sessionId:identity.sessionId,expectedRevision:workspace.revision,idempotencyKey:key})});const result=updated.commandReceipts.find(r=>r.workspaceId===identity.workspaceId&&r.idempotencyKey===key)?.result;if(!result||result.kind!=='profile-committed')throw new LearnLoopDomainError('INVALID_PROJECT_PHASE','Canonical profile receipt is missing.');return{status:'profile-review' as const,profileRevision:result.profileRevision}}})}
+
 export function createLearnLoopCreatePlanDraftTool(table:StateTable,resolveWorkspace:WorkspaceResolver){
   const describedText=(title:string,description:string,example:string)=>({type:'string' as const,required:true as const,title,description,examples:[example]})
   const task={type:'object' as const,additionalProperties:false,properties:{
@@ -38,7 +37,7 @@ export function createLearnLoopCreatePlanDraftTool(table:StateTable,resolveWorks
       for(const [taskIndex,task] of tasks.entries()){
         if(typeof task!=='object'||task===null)continue
         const activity=(task as {activity?:unknown}).activity
-        if(typeof activity==='string'&&!['explain','example','apply'].includes(activity))return[{type:'text',text:encodeToolError({code:'INVALID_ARGS',retryable:true,message:'Tool arguments were rejected before execution.',path:`plan.stages[${stageIndex}].tasks[${taskIndex}].activity`,received:activity,allowedValues:['explain','example','apply'],semanticHint:'activity describes the learning activity; reflection belongs in checkPrompt.',maxRetries:1})}]
+        if(typeof activity==='string'&&!['explain','example','apply'].includes(activity))return[{type:'text',text:encodeToolError({code:'INVALID_ARGS',category:'pre-execution',recovery:{kind:'correct-and-retry',maxAttempts:1},message:'Tool arguments were rejected before execution.',details:{path:`plan.stages[${stageIndex}].tasks[${taskIndex}].activity`,received:activity,allowedValues:['explain','example','apply'],semanticHint:'activity describes the learning activity; reflection belongs in checkPrompt.'}})}]
       }
     }
     return finalizeLearnLoopToolError(exec,result)

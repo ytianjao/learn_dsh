@@ -8,7 +8,7 @@ import type {} from '@deepseek-ai/dsh-workspace'
 import { emptyState, ensureState, learnLoopDomainSpec } from './domain.js'
 import { API_PATH, EXPORT_PATH, MANAGE_PATH, createLearnLoopHttpHandler } from './http.js'
 import type { StateTable } from './types.js'
-import { createLearnLoopCommitProfileTool, createLearnLoopCreatePlanDraftTool } from './tool.js'
+import { createLearnLoopCreatePlanDraftTool } from './tool.js'
 import {LearnLoopToolRestrictions} from './tool-restriction.js'
 import { createLearnLoopAssessmentTool } from './assessment-tool.js'
 import { renderLearnLoopSystemSection, sessionIdFromAssembleContext } from './prompt.js'
@@ -29,6 +29,8 @@ export * from './evidence-bridge.js'
 export * from './workspace.js'
 export * from './plan-intent.js'
 export * from './dsh-session-adapter.js'
+export * from './interview-probes.js'
+export * from './profile-compiler.js'
 
 export const name = 'learnloop'
 export const inject = ['storageDomain', 'webServer', 'tools', 'systemPrompt', 'agents', 'sessions', 'workspaceRegistry']
@@ -43,7 +45,6 @@ export async function apply(ctx: Context): Promise<void> {
     if(!sessionId)ctx.logger('learnloop').debug({code:'PROMPT_AGENT_CONTEXT_MISSING'},'Runtime prompt omitted: agent context missing')
     return renderLearnLoopSystemSection(table.get('singleton') ?? emptyState(),sessionId)
   } }), 'learnloop.systemPrompt()')
-  ctx.effect(() => ctx.tools.register(createLearnLoopCommitProfileTool(table, workspaceResolver)), 'learnloop.commitProfileTool()')
   ctx.effect(() => ctx.tools.register(createLearnLoopCreatePlanDraftTool(table, workspaceResolver)), 'learnloop.createPlanDraftTool()')
   const sessionReader=createDshSessionReader(ctx.sessions)
   ctx.effect(() => ctx.tools.register(createLearnLoopAssessmentTool(table, sessionReader)), 'learnloop.assessmentTool()')
