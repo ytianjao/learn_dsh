@@ -60,3 +60,7 @@ State schema 9, Storage Domain 6 and backup format 4 are a clean breaking epoch.
 ## 0.7.0 host-authoritative onboarding
 
 Runtime V4 resolves `AssembleContext.agent.id`, persists a one-topic-at-a-time evidence-backed interview, and moves Profile/Plan approval to explicit LearnLoop UI HTTP actions. Schema 10, Storage Domain 7, and backup 5 are a clean epoch; clear only LearnLoop data. Static HTML publication remains out of scope.
+
+## 0.8.0 adaptive interview contract
+
+An Interview Topic is not one question. A required **Probe** is the smallest Host-verifiable information slot, and a non-empty answer does not by itself complete a Topic. The Host owns Probe progression and compiles the Profile from learner evidence; the model cannot submit a complete Profile. Profile and Plan approval are direct View actions. Canonical `LessonDocument` JSON remains the learning-content fact source; HTML publication is a later release.

@@ -74,3 +74,10 @@ Activation is Host-owned: button → HTTP `begin-learning-mode` → `interviewin
 ## 0.7.0 host-authoritative onboarding
 
 Runtime V4 resolves `AssembleContext.agent.id`, persists a one-topic-at-a-time evidence-backed interview, and moves Profile/Plan approval to explicit LearnLoop UI HTTP actions. Schema 10, Storage Domain 7, and backup 5 are a clean epoch; clear only LearnLoop data. Static HTML publication remains out of scope.
+
+## 0.8.0 — adaptive onboarding runtime
+
+- Replaced topic-as-question onboarding with Host-owned required Probes and deterministic Profile compilation.
+- Added Host-authoritative Plan View approval/revision controls and the `LEARNLOOP_TOOL_ERROR_V2` recovery directive.
+- Advanced the breaking persistence epoch to state schema 11, Storage Domain 8, and backup format 6. DSH remains pinned to 0.1.1-rc.2.
+- Canonical lesson JSON remains the content fact model; HTML, static publication, directory selection, and ZIP are still out of scope.

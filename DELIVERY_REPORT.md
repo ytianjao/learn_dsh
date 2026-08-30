@@ -19,3 +19,7 @@ Schema 9 / Storage Domain 6 / backup 4 adds explicit teaching source segments, s
 ## 0.7.0 host-authoritative onboarding
 
 Runtime V4 resolves `AssembleContext.agent.id`, persists a one-topic-at-a-time evidence-backed interview, and moves Profile/Plan approval to explicit LearnLoop UI HTTP actions. Schema 10, Storage Domain 7, and backup 5 are a clean epoch; clear only LearnLoop data. Static HTML publication remains out of scope.
+
+## 0.8.0 adaptive runtime delivery
+
+The Host now evaluates required interview Probes rather than equating one non-empty answer with a Topic. It compiles Profile drafts from learner evidence, while Profile and Plan Views remain the authorization boundary. Tool failures use explicit V2 recovery directives. This delivery does not publish HTML or implement filesystem export selection.

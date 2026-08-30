@@ -1,6 +1,6 @@
 {
   "name": "@learnloop/dsh-learnloop",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "Local-first long-term learning companion for DeepSeek Harness Web",
   "type": "module",
   "license": "MIT",
