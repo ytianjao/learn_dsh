@@ -1,4 +1,5 @@
 import type {InterviewProbeId,InterviewTopic,ProfileInterviewState} from './types.js'
+import {LearnLoopDomainError} from './domain.js'
 
 export interface InterviewOption { label:string; value:string }
 export interface InterviewProbeDefinition {id:InterviewProbeId;topic:InterviewTopic;inputMode:'free-text'|'single-select'|'multi-select';options?:readonly InterviewOption[];allowExplicitNone:boolean;minTextLength?:number}
@@ -17,6 +18,17 @@ export const probesForTopic=(topic:InterviewTopic)=>INTERVIEW_PROBES.filter(p=>p
 const placeholders=new Set(['不知道','随便','某个技能','一个项目','都可以','以后再说','unknown','anything'])
 export function validateProbeAnswer(definition:InterviewProbeDefinition,selected:readonly string[],custom?:string):{valid:boolean;value:string|string[]|number|null;empty:boolean}{
  const raw=(custom??'').trim(); if(definition.inputMode!=='free-text'){const values=selected.map(v=>v.trim()).filter(Boolean),allowed=new Set(definition.options?.map(o=>o.value));const valid=values.length===(definition.inputMode==='single-select'?1:values.length)&&values.length>0&&values.every(v=>allowed.has(v));const value=valid?values[0]!:null;return{valid,value:definition.id==='time-budget.weekly-hours'&&value?Number(value):value,empty:values.length===0}}
- if(!raw)return{valid:false,value:null,empty:true};const normalized=raw.toLowerCase();const explicitNone=definition.allowExplicitNone&&['无','没有','无额外限制','none','no deadline'].includes(normalized);const invalid=(!explicitNone&&raw.length<(definition.minTextLength??1))||placeholders.has(normalized)||/learnloop_|tool\s*(?:call|result)|system\s*prompt/i.test(raw);return{valid:!invalid,value:invalid?null:raw,empty:false}
+ if(!raw)return{valid:false,value:null,empty:true};const normalized=raw.toLowerCase();const explicitNone=definition.allowExplicitNone&&['无','没有','无额外限制','none','no deadline'].includes(normalized);const invalid=(!explicitNone&&raw.length<(definition.minTextLength??1))||placeholders.has(normalized);return{valid:!invalid,value:invalid?null:raw,empty:false}
+}
+/** Convert the native DSH label boundary to the Probe's internal value without guessing. */
+export function normalizeNativeAnswer(definition:InterviewProbeDefinition,options:readonly InterviewOption[],selected:readonly string[],custom?:string){
+ const raw=(custom??'').trim()
+ if(raw)return validateProbeAnswer({...definition,inputMode:'free-text'},[],raw)
+ const labels=selected.map(item=>item.trim()).filter(Boolean)
+ if(!labels.length)return{valid:false,value:null as string|string[]|number|null,empty:true}
+ if(definition.inputMode==='single-select'&&labels.length!==1)throw new LearnLoopDomainError('INTERVIEW_QUESTION_CONTRACT_INVALID','A single-select native question returned multiple labels.')
+ const byLabel=new Map(options.map(option=>[option.label,option.value] as const))
+ if(labels.some(label=>!byLabel.has(label)))throw new LearnLoopDomainError('INTERVIEW_QUESTION_CONTRACT_INVALID','The native answer contained a label that was not offered.')
+ return validateProbeAnswer(definition,labels.map(label=>byLabel.get(label)!),undefined)
 }
 export function questionForProbe(id:InterviewProbeId,interview:ProfileInterviewState):string{const subject=String(interview.probes['goal.subject']?.normalizedValue??'').trim();if(id==='goal.subject'){const kind=interview.probes['goal.kind'].normalizedValue;return kind==='project'?'你具体想完成什么项目？':kind==='exam'?'你具体想通过哪项考试或认证？':kind==='domain'?'你具体想系统学习哪个领域？':'你具体想掌握哪项技能？'}if(id==='target-outcome.capability'&&subject)return`学习完 ${subject} 后，你希望能够独立完成什么具体事情？`;return`请回答 ${id} 所需的具体信息。`}

@@ -5,6 +5,7 @@ import type {} from '@deepseek-ai/dsh-storage-domain'
 import type {} from '@deepseek-ai/dsh-tools'
 import type {} from '@deepseek-ai/dsh-system-prompt'
 import type {} from '@deepseek-ai/dsh-workspace'
+import type {} from '@deepseek-ai/dsh-user-questions'
 import { emptyState, ensureState, learnLoopDomainSpec } from './domain.js'
 import { API_PATH, EXPORT_PATH, MANAGE_PATH, createLearnLoopHttpHandler } from './http.js'
 import type { StateTable } from './types.js'
@@ -13,9 +14,10 @@ import {LearnLoopToolRestrictions} from './tool-restriction.js'
 import { createLearnLoopAssessmentTool } from './assessment-tool.js'
 import { renderLearnLoopSystemSection, sessionIdFromAssembleContext } from './prompt.js'
 import { capturePreStepAnswer, enrichCandidateEvent } from './evidence-bridge.js'
-import {recordProfileInterviewAnswer} from './workspace.js'
+import {consumeProfileFallbackMessage} from './workspace.js'
 import { resolveCanonicalWorkspace } from './workspace-identity.js'
 import {createDshSessionReader} from './dsh-session-adapter.js'
+import {createLearnLoopProfileQuestionTool} from './interview-tool.js'
 
 export * from './workspace-identity.js'
 export * from './domain.js'
@@ -31,6 +33,7 @@ export * from './plan-intent.js'
 export * from './dsh-session-adapter.js'
 export * from './interview-probes.js'
 export * from './profile-compiler.js'
+export * from './interview-tool.js'
 
 export const name = 'learnloop'
 export const inject = ['storageDomain', 'webServer', 'tools', 'systemPrompt', 'agents', 'sessions', 'workspaceRegistry']
@@ -47,12 +50,13 @@ export async function apply(ctx: Context): Promise<void> {
   } }), 'learnloop.systemPrompt()')
   ctx.effect(() => ctx.tools.register(createLearnLoopCreatePlanDraftTool(table, workspaceResolver)), 'learnloop.createPlanDraftTool()')
   const sessionReader=createDshSessionReader(ctx.sessions)
+  ctx.effect(() => ctx.tools.register(createLearnLoopProfileQuestionTool(table,ctx.userQuestions,sessionReader)), 'learnloop.profileQuestionTool()')
   ctx.effect(() => ctx.tools.register(createLearnLoopAssessmentTool(table, sessionReader)), 'learnloop.assessmentTool()')
-  ctx.on('agent/pre-step', (payload, next) => capturePreStepAnswer(table, String(payload.agent.id), payload.signal, next))
   let eventWrites = Promise.resolve()
+  ctx.on('agent/pre-step', async (payload, next) => {await eventWrites;return capturePreStepAnswer(table, String(payload.agent.id), payload.signal, next)})
   ctx.on('session/event', (session, event) => {
     if (event.type !== 'user/message') return
-    eventWrites = eventWrites.then(() => table.update('singleton', state => enrichCandidateEvent(state, String(session.id), event.data, event.seq))).then(() => undefined, error => { ctx.logger('learnloop').error(error, 'Failed to enrich candidate provenance') })
+    eventWrites = eventWrites.then(() => table.update('singleton', state => {const enriched=enrichCandidateEvent(state,String(session.id),event.data,event.seq);if(event.data.source.kind!=='user')return enriched;const text=event.data.content.filter(block=>block.type==='text').map(block=>block.text).join('\n').trim();return consumeProfileFallbackMessage(enriched,{sessionId:String(session.id),messageId:String(event.data.id),eventSeq:event.seq,text})})).then(state=>{sync(state,[String(session.id)])},error => { ctx.logger('learnloop').error(error, 'Failed to consume user message provenance') })
   })
   const restrictions=new LearnLoopToolRestrictions()
   let syncing=false,scheduled=false
@@ -62,7 +66,7 @@ export async function apply(ctx: Context): Promise<void> {
   ctx.on('agent/created',({agent})=>restrictions.sync(agent,table.get('singleton')??emptyState()))
   ctx.on('agent/session-start',({agent})=>restrictions.sync(agent,table.get('singleton')??emptyState()))
   ctx.on('agent/disposed',({agent})=>restrictions.dispose(String(agent.id)))
-  ctx.on('tools/result',(exec,result)=>{if(!exec.agent)return;if(exec.name==='ask_user_question'&&!result.isError){const value=result.value as {answers?:Array<{id:string;selected?:string[];custom?:string}>},answer=value.answers?.[0];if(answer)eventWrites=eventWrites.then(()=>table.update('singleton',state=>recordProfileInterviewAnswer(state,{sessionId:String(exec.agent!.id),callId:String(exec.callId),questionId:answer.id,selected:answer.selected??[],custom:answer.custom}))).then(state=>{restrictions.sync(exec.agent!,state)},error=>{ctx.logger('learnloop').error(error,'Failed to record interview answer')})}else if(exec.name.startsWith('learnloop_'))restrictions.sync(exec.agent,table.get('singleton')??emptyState())})
+  ctx.on('tools/result',(exec)=>{if(exec.agent&&exec.name.startsWith('learnloop_'))restrictions.sync(exec.agent,table.get('singleton')??emptyState())})
   sync()
   ctx.effect(()=>()=>restrictions.disposeAll(),'learnloop.toolRestrictions()')
   const handler = createLearnLoopHttpHandler(table, sessionReader, workspaceResolver,(state,sessions)=>sync(state,sessions))
