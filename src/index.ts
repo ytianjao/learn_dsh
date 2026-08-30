@@ -36,7 +36,7 @@ export * from './profile-compiler.js'
 export * from './interview-tool.js'
 
 export const name = 'learnloop'
-export const inject = ['storageDomain', 'webServer', 'tools', 'systemPrompt', 'agents', 'sessions', 'workspaceRegistry']
+export const inject = ['storageDomain', 'webServer', 'tools', 'systemPrompt', 'agents', 'sessions', 'workspaceRegistry', 'userQuestions']
 
 export async function apply(ctx: Context): Promise<void> {
   const domain = await ctx.storageDomain.open(learnLoopDomainSpec)
