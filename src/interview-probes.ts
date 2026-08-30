@@ -1,16 +1,16 @@
 import type {InterviewProbeId,InterviewTopic,ProfileInterviewState} from './types.js'
 import {LearnLoopDomainError} from './domain.js'
 
-export interface InterviewOption { label:string; value:string }
+export interface InterviewOption { label:string; value:string; chatAliases?:readonly string[] }
 export interface InterviewProbeDefinition {
  id:InterviewProbeId; topic:InterviewTopic; inputMode:'free-text'|'single-select'|'multi-select';
- options?:readonly InterviewOption[]; customPolicy:'forbidden'|'free-text'; allowExplicitNone:boolean;
+ options?:readonly InterviewOption[]; customPolicy:'forbidden'|'free-text'; fallbackMode:'free-text'|'exact-option'; allowExplicitNone:boolean;
  minTextLength?:number; question:(interview:ProfileInterviewState)=>string
 }
 const subject=(interview:ProfileInterviewState)=>String(interview.probes['goal.subject']?.normalizedValue??'').trim()
-const goalOptions=[{label:'掌握一项具体技能',value:'skill'},{label:'完成一个具体项目',value:'project'},{label:'通过考试或认证',value:'exam'},{label:'系统性提升某个领域',value:'domain'}] as const
-const single=(id:InterviewProbeId,topic:InterviewTopic,question:string|InterviewProbeDefinition['question'],options:readonly InterviewOption[]):InterviewProbeDefinition=>({id,topic,inputMode:'single-select',options,customPolicy:'forbidden',allowExplicitNone:false,question:typeof question==='string'?()=>question:question})
-const free=(id:InterviewProbeId,topic:InterviewTopic,question:InterviewProbeDefinition['question'],minTextLength=2,allowExplicitNone=false):InterviewProbeDefinition=>({id,topic,inputMode:'free-text',customPolicy:'free-text',allowExplicitNone,minTextLength,question})
+const goalOptions=[{label:'掌握一项具体技能',value:'skill',chatAliases:['技能','掌握技能','学一项技能','我想学会一项技能']},{label:'完成一个具体项目',value:'project',chatAliases:['项目','完成项目']},{label:'通过考试或认证',value:'exam',chatAliases:['考试','认证']},{label:'系统性提升某个领域',value:'domain',chatAliases:['领域','系统学习领域']}] as const
+const single=(id:InterviewProbeId,topic:InterviewTopic,question:string|InterviewProbeDefinition['question'],options:readonly InterviewOption[]):InterviewProbeDefinition=>({id,topic,inputMode:'single-select',options,customPolicy:'forbidden',fallbackMode:'exact-option',allowExplicitNone:false,question:typeof question==='string'?()=>question:question})
+const free=(id:InterviewProbeId,topic:InterviewTopic,question:InterviewProbeDefinition['question'],minTextLength=2,allowExplicitNone=false):InterviewProbeDefinition=>({id,topic,inputMode:'free-text',customPolicy:'free-text',fallbackMode:'free-text',allowExplicitNone,minTextLength,question})
 export const INTERVIEW_PROBES:readonly InterviewProbeDefinition[]=[
  single('goal.kind','goal','这次学习最接近哪一种目标？',goalOptions),
  free('goal.subject','goal',interview=>({project:'你具体想完成什么项目？',exam:'你具体想通过哪项考试或认证？',domain:'你具体想系统学习哪个领域？'}[String(interview.probes['goal.kind'].normalizedValue)]??'你具体想掌握哪项技能？')),
@@ -34,6 +34,13 @@ export function validateProbeAnswer(definition:InterviewProbeDefinition,selected
  const raw=(custom??'').trim(); if(definition.inputMode!=='free-text'){const values=selected.map(v=>v.trim()).filter(Boolean),allowed=new Set(definition.options?.map(o=>o.value));const valid=values.length===(definition.inputMode==='single-select'?1:values.length)&&values.length>0&&values.every(v=>allowed.has(v));const value=valid?values[0]!:null;return{valid,value:definition.id==='time-budget.weekly-hours'&&value?Number(value):value,empty:values.length===0}}
  if(!raw)return{valid:false,value:null,empty:true};const normalized=raw.toLowerCase();const explicitNone=definition.allowExplicitNone&&['无','没有','无额外限制','none','no deadline'].includes(normalized);const invalid=(!explicitNone&&raw.length<(definition.minTextLength??1))||placeholders.has(normalized);return{valid:!invalid,value:invalid?null:raw,empty:false}
 }
+export function normalizeChatAnswer(definition:InterviewProbeDefinition,text:string){
+ if(definition.fallbackMode==='free-text')return validateProbeAnswer(definition,[],text)
+ const raw=text.trim(),matches=(definition.options??[]).filter(option=>option.label===raw||option.chatAliases?.includes(raw))
+ if(matches.length!==1)return{valid:false,value:null as string|string[]|number|null,empty:raw.length===0}
+ return validateProbeAnswer(definition,[matches[0]!.value])
+}
+export const allowedChatReplies=(definition:InterviewProbeDefinition)=>definition.fallbackMode==='exact-option'?(definition.options??[]).map(option=>option.label):[]
 export function normalizeNativeAnswer(definition:InterviewProbeDefinition,options:readonly InterviewOption[],selected:readonly string[],custom?:string){
  const raw=(custom??'').trim()
  if(raw){if(definition.customPolicy==='forbidden')throw new LearnLoopDomainError('INTERVIEW_QUESTION_CONTRACT_INVALID','This native question does not accept custom text.');return validateProbeAnswer(definition,[],raw)}
