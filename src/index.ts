@@ -14,10 +14,10 @@ import {LearnLoopToolRestrictions} from './tool-restriction.js'
 import { createLearnLoopAssessmentTool } from './assessment-tool.js'
 import { renderLearnLoopSystemSection, sessionIdFromAssembleContext } from './prompt.js'
 import { capturePreStepAnswer, enrichCandidateEvent } from './evidence-bridge.js'
-import {consumeProfileFallbackMessage} from './workspace.js'
+import {consumeProfileFallbackMessage,reconcileProfileInterviewQuestions} from './workspace.js'
 import { resolveCanonicalWorkspace } from './workspace-identity.js'
 import {createDshSessionReader} from './dsh-session-adapter.js'
-import {createLearnLoopProfileQuestionTool} from './interview-tool.js'
+import {createLearnLoopProfileQuestionTool,liveProfileQuestionCalls} from './interview-tool.js'
 
 export * from './workspace-identity.js'
 export * from './domain.js'
@@ -42,6 +42,7 @@ export async function apply(ctx: Context): Promise<void> {
   const domain = await ctx.storageDomain.open(learnLoopDomainSpec)
   const table = domain.table('state') as StateTable
   await ensureState(table)
+  await table.update('singleton',state=>reconcileProfileInterviewQuestions(state,liveProfileQuestionCalls))
   const workspaceResolver = (sessionId: string, claim?: string) => resolveCanonicalWorkspace(ctx.workspaceRegistry, sessionId, claim)
   ctx.effect(() => ctx.systemPrompt.section({ name: 'learnloop-runtime', order: 50, text: context => {
     const sessionId=sessionIdFromAssembleContext(context)
@@ -52,7 +53,7 @@ export async function apply(ctx: Context): Promise<void> {
   const sessionReader=createDshSessionReader(ctx.sessions)
   ctx.effect(() => ctx.tools.register(createLearnLoopProfileQuestionTool(table,ctx.userQuestions,sessionReader)), 'learnloop.profileQuestionTool()')
   ctx.effect(() => ctx.tools.register(createLearnLoopAssessmentTool(table, sessionReader)), 'learnloop.assessmentTool()')
-  let eventWrites = Promise.resolve()
+  let eventWrites:Promise<unknown> = Promise.resolve()
   ctx.on('agent/pre-step', async (payload, next) => {await eventWrites;return capturePreStepAnswer(table, String(payload.agent.id), payload.signal, next)})
   ctx.on('session/event', (session, event) => {
     if (event.type !== 'user/message') return
@@ -64,8 +65,8 @@ export async function apply(ctx: Context): Promise<void> {
   const scheduleSync=()=>{if(syncing||scheduled)return;scheduled=true;queueMicrotask(()=>{scheduled=false;sync()})}
   ctx.on('tools/change',scheduleSync)
   ctx.on('agent/created',({agent})=>restrictions.sync(agent,table.get('singleton')??emptyState()))
-  ctx.on('agent/session-start',({agent})=>restrictions.sync(agent,table.get('singleton')??emptyState()))
-  ctx.on('agent/disposed',({agent})=>restrictions.dispose(String(agent.id)))
+  ctx.on('agent/session-start',({agent})=>{eventWrites=eventWrites.then(()=>table.update('singleton',state=>reconcileProfileInterviewQuestions(state,liveProfileQuestionCalls))).then(state=>restrictions.sync(agent,state),error=>ctx.logger('learnloop').error(error,'Failed to reconcile Profile questions'))})
+  ctx.on('agent/disposed',({agent})=>{restrictions.dispose(String(agent.id));eventWrites=eventWrites.then(()=>table.update('singleton',state=>reconcileProfileInterviewQuestions(state,liveProfileQuestionCalls,'agent-disposed'))).catch(error=>ctx.logger('learnloop').error(error,'Failed to release disposed-agent Profile question'))})
   ctx.on('tools/result',(exec)=>{if(exec.agent&&exec.name.startsWith('learnloop_'))restrictions.sync(exec.agent,table.get('singleton')??emptyState())})
   sync()
   ctx.effect(()=>()=>restrictions.disposeAll(),'learnloop.toolRestrictions()')

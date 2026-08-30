@@ -4,6 +4,7 @@ set -euo pipefail
 
 readonly REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 export DSH_HOME="$HOME/.dsh-learnloop-acceptance"
+export LEARNLOOP_E2E_WORKSPACE="${RUNNER_TEMP:-/tmp}/learnloop-e2e-workspace"
 
 run_dsh() {
   if [[ -n "${DSH_BIN:-}" ]]; then
@@ -18,6 +19,10 @@ node -e "const b=require('./scripts/dsh-baseline.json'); console.log('DSH versio
 printf 'LearnLoop commit: %s\nNode version: %s\npnpm version: %s\n' "$(git rev-parse HEAD)" "$(node --version)" "$(pnpm --version)"
 pnpm run verify:dsh-baseline
 printf 'Using isolated DSH_HOME: %s\n' "$DSH_HOME"
+rm -rf -- "$LEARNLOOP_E2E_WORKSPACE"
+mkdir -p "$LEARNLOOP_E2E_WORKSPACE"
+printf '{"name":"learnloop-e2e-workspace","private":true}\n' >"$LEARNLOOP_E2E_WORKSPACE/package.json"
+printf 'Created acceptance Workspace directory: %s\n' "$LEARNLOOP_E2E_WORKSPACE"
 printf 'Building LearnLoop without a model request...\n'
 pnpm run build
 
