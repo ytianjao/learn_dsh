@@ -81,3 +81,10 @@ Runtime V4 resolves `AssembleContext.agent.id`, persists a one-topic-at-a-time e
 - Added Host-authoritative Plan View approval/revision controls and the `LEARNLOOP_TOOL_ERROR_V2` recovery directive.
 - Advanced the breaking persistence epoch to state schema 11, Storage Domain 8, and backup format 6. DSH remains pinned to 0.1.1-rc.2.
 - Canonical lesson JSON remains the content fact model; HTML, static publication, directory selection, and ZIP are still out of scope.
+
+## 0.9.0 — learner-first scaffolded interview
+
+- Breaking epoch: package 0.9.0, state schema 12, Storage Domain 9, backup format 7; HTTP API v3 and pinned DSH 0.1.1-rc.2 are unchanged.
+- Removed learner-facing `goal.kind`; onboarding now captures `goal.subject` first and scaffolds `goal.outcome` with validated model suggestions or a generic Host ladder.
+- Added opaque pending-question tokens, option snapshots, Probe-specific uncertainty, deterministic result actions, safe error recovery, and separate learner/Host field origins.
+- No schema-11 migration or legacy no-argument Tool alias is provided. Clear only LearnLoop domain data or use an isolated `DSH_HOME`.

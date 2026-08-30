@@ -2,9 +2,9 @@
 
 LearnLoop is a local-first learning companion for DSH `0.1.1-rc.2` (baseline `b150a551b8d465e31e418e1b2eaf5e79bbb7d28e`). It requires Node `^22.19.0 || >=24` and pnpm `11.7.0`. LearnLoop never reads or manages model credentials.
 
-## Canonical workspace and content model (0.6.0)
+## Canonical workspace and content model
 
-Persisted schema 7 has one root: `schemaVersion`, `revision`, `settings`, `workspaces`, and scoped `commandReceipts`. Each Workspace owns project identities, `activeProjectId`, `activeSessionId`, revision, and events. Each Project aggregate owns its profile, immutable plan versions, execution, candidates, verified assessments and evidence, mastery, adjustments, misconceptions, and review queue. A Session is only the current execution attachment; changing sessions does not move or copy a project.
+Persisted schema 12 has one root: `schemaVersion`, `revision`, `settings`, `workspaces`, and scoped `commandReceipts`. Each Workspace owns project identities, `activeProjectId`, `activeSessionId`, revision, and events. Each Project aggregate owns its profile, immutable plan versions, execution, candidates, verified assessments and evidence, mastery, adjustments, misconceptions, and review queue. A Session is only the current execution attachment; changing sessions does not move or copy a project.
 
 The HTTP boundary is `/learnloop/api/v3/state`, `/learnloop/api/v3/manage`, and `/learnloop/api/v3/export`. State reads are scoped by `workspaceId`; backup format 3 exports only the canonical Workspace aggregate and current settings.
 
@@ -64,3 +64,7 @@ Runtime V4 resolves `AssembleContext.agent.id`, persists a one-topic-at-a-time e
 ## 0.8.0 adaptive interview contract
 
 An Interview Topic is not one question. A required **Probe** is the smallest Host-verifiable information slot, and a non-empty answer does not by itself complete a Topic. The Host owns Probe progression and compiles the Profile from learner evidence; the model cannot submit a complete Profile. Profile and Plan approval are direct View actions. Canonical `LessonDocument` JSON remains the learning-content fact source; HTML publication is a later release.
+
+## 0.9 learner-first Profile interview
+
+Profile onboarding starts with **“你现在想学什么？ / What would you like to learn?”** and accepts the learner's own words through DSH's native custom-input path. Internal goal categories are not learner-facing questions. The Host then presents a validated cognitive ladder, treats uncertainty as a request for scaffolding, and records learner text, learner choices, and Host recommendations as distinct origins. Every pending native question has an opaque, durable `questionToken`; ordinary Chat can answer a Probe only after the Host explicitly enters `fallback-to-chat`. Profile View remains the final authorization boundary.
