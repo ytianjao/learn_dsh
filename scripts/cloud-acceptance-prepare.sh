@@ -3,8 +3,8 @@
 set -euo pipefail
 
 readonly REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-export DSH_HOME="$HOME/.dsh-learnloop-acceptance"
-export LEARNLOOP_E2E_WORKSPACE="${RUNNER_TEMP:-/tmp}/learnloop-e2e-workspace"
+export DSH_HOME="${DSH_HOME:-$HOME/.dsh-learnloop-acceptance}"
+export LEARNLOOP_E2E_WORKSPACE="${LEARNLOOP_E2E_WORKSPACE:-${RUNNER_TEMP:-/tmp}/learnloop-e2e-workspace}"
 
 run_dsh() {
   if [[ -n "${DSH_BIN:-}" ]]; then

@@ -56,45 +56,10 @@ jobs:
       - name: Block real DeepSeek endpoints
         run: |
           printf '127.0.0.1 api.deepseek.com\n127.0.0.1 api.deepseek.com.cn\n' | sudo tee -a /etc/hosts
-      - name: Start deterministic mock provider
-        run: |
-          node scripts/learner-first-mock-provider.mjs 8000 >mock-provider.log 2>&1 &
-          echo $! >mock-provider.pid
-          mock_provider_pid="$(cat mock-provider.pid)"
-          if ! timeout 60 bash -c '
-            until curl --silent --output /dev/null http://127.0.0.1:8000/; do
-              kill -0 "$1" 2>/dev/null || exit 1
-              sleep 1
-            done
-          ' _ "$mock_provider_pid"; then
-            echo "Mock provider did not become ready; provider output follows:" >&2
-            cat mock-provider.log >&2
-            exit 1
-          fi
-      - name: Prepare isolated DSH profile
-        run: pnpm run acceptance:prepare 2>&1 | tee fixture-setup.log
-      - name: Start DSH Web on loopback
-        run: |
-          DSH_HOME="$HOME/.dsh-learnloop-acceptance" node "$DSH_BIN" web --patch e2e/fixtures/mock-provider.patch.yml --host 127.0.0.1 --port 3080 --no-open >dsh-web.log 2>&1 &
-          echo $! >dsh-web.pid
-          if ! timeout 60 bash -c 'until curl --fail --silent http://127.0.0.1:3080/ >/dev/null; do sleep 1; done'; then
-            echo "DSH Web did not become ready; server output follows:" >&2
-            cat dsh-web.log >&2
-            exit 1
-          fi
-      - name: Run LearnLoop browser acceptance
-        run: pnpm run acceptance:test
-      - name: Stop background services
-        if: always()
-        run: |
-          if test -f dsh-web.pid; then kill "$(cat dsh-web.pid)" 2>/dev/null || test $? -eq 1; fi
-          if test -f mock-provider.pid; then kill "$(cat mock-provider.pid)" 2>/dev/null || test $? -eq 1; fi
-      - name: Reset isolated acceptance state
-        if: always()
-        continue-on-error: true
-        run: pnpm run acceptance:reset
+      - name: Run keyless web E2E with isolated lifecycle
+        run: pnpm run e2e:keyless:web
       - name: Upload browser reports, screenshots, traces, and logs
-        if: always()
+        if: failure()
         uses: actions/upload-artifact@v5
         with:
           name: learnloop-web-e2e-${{ github.run_id }}
