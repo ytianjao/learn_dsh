@@ -89,6 +89,10 @@ jobs:
         run: |
           if test -f dsh-web.pid; then kill "$(cat dsh-web.pid)" 2>/dev/null || test $? -eq 1; fi
           if test -f mock-provider.pid; then kill "$(cat mock-provider.pid)" 2>/dev/null || test $? -eq 1; fi
+      - name: Reset isolated acceptance state
+        if: always()
+        continue-on-error: true
+        run: pnpm run acceptance:reset
       - name: Upload browser reports, screenshots, traces, and logs
         if: always()
         uses: actions/upload-artifact@v5
