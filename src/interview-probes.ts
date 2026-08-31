@@ -35,14 +35,26 @@ export const INTERVIEW_PROBES:readonly InterviewProbeDefinition[]=[
 export const probeDefinition=(id:InterviewProbeId)=>INTERVIEW_PROBES.find(p=>p.id===id)!
 export const probesForTopic=(topic:InterviewTopic)=>INTERVIEW_PROBES.filter(p=>p.topic===topic).map(p=>p.id)
 export const isUncertain=(text:string)=>['不知道','不确定','随便','都可以','以后再说','unknown'].includes(text.trim().toLowerCase())
-export function validateProbeAnswer(def:InterviewProbeDefinition,selected:readonly string[],custom?:string,options:readonly InterviewOption[]=def.fixedOptions??[]){
- const raw=(custom??'').trim(); if(raw){if(isUncertain(raw))return{valid:def.uncertaintyPolicy==='accept',value:def.uncertaintyPolicy==='accept'?raw:null,empty:false,uncertain:true};return{valid:raw.length>=(def.minTextLength??1),value:raw,empty:false,uncertain:false}}
+export function validateProbeAnswer(def:InterviewProbeDefinition,selected:readonly string[],custom?:string,options:readonly InterviewOption[]=def.fixedOptions??[],presentationMode:InterviewQuestionMode=def.questionMode){
+ const raw=(custom??'').trim(); if(raw){
+  if(isUncertain(raw))return{valid:def.uncertaintyPolicy==='accept',value:def.uncertaintyPolicy==='accept'?raw:null,empty:false,uncertain:true,clarification:false}
+  if(presentationMode!=='free-text'&&def.customPolicy==='accept-and-clarify'){
+   const exact=options.find(o=>o.label.trim()===raw||o.value.trim()===raw)
+   if(exact)return{valid:true,value:def.id==='goal.outcome'?exact.label:exact.value,displayValue:exact.label,empty:false,uncertain:false,clarification:false,level:exact.level,option:exact}
+   if(def.id==='time-budget.weekly-hours'){
+    const match=raw.match(/^(?:每周\s*)?(\d{1,2})(?:\s*(?:小时|hours?|h))?$/i),hours=match?Number(match[1]):NaN
+    if(Number.isInteger(hours)&&hours>=1&&hours<=80)return{valid:true,value:hours,displayValue:`${hours} 小时`,empty:false,uncertain:false,clarification:false}
+   }
+   return{valid:false,value:null,empty:false,uncertain:false,clarification:true}
+  }
+  return{valid:raw.length>=(def.minTextLength??1),value:raw,empty:false,uncertain:false,clarification:false}
+ }
  if(!selected.length)return{valid:false,value:null,empty:true,uncertain:false}
  const match=options.find(o=>o.label===selected[0]||o.value===selected[0]);if(!match)return{valid:false,value:selected[0]!,empty:false,uncertain:false}
  if(match.provenance==='host-uncertainty')return{valid:true,value:'overview',displayValue:'理解核心概念和完整流程',empty:false,uncertain:true,level:'overview' as const,option:match}
  return{valid:true,value:def.id==='goal.outcome'?match.label:match.value,displayValue:match.label,empty:false,uncertain:false,level:match.level,option:match}
 }
-export const normalizeNativeAnswer=(def:InterviewProbeDefinition,options:readonly InterviewOption[],selected:readonly string[],custom?:string)=>validateProbeAnswer(def,selected,custom,options)
+export const normalizeNativeAnswer=(def:InterviewProbeDefinition,options:readonly InterviewOption[],selected:readonly string[],custom?:string,presentationMode:InterviewQuestionMode=def.questionMode)=>validateProbeAnswer(def,selected,custom,options,presentationMode)
 export const normalizeChatAnswer=(def:InterviewProbeDefinition,text:string)=>validateProbeAnswer(def,[],text)
 export const allowedChatReplies=(def:InterviewProbeDefinition)=>(def.fixedOptions??[]).map(x=>x.label)
 export const questionForProbe=(id:InterviewProbeId,interview:ProfileInterviewState)=>probeDefinition(id).question(interview)
@@ -54,6 +66,6 @@ export function validateScaffoldOptions(input:readonly ScaffoldOptionInput[]){
  const labels=new Set<string>();let prior=-1
  for(const o of input){const label=o.label.trim();if(label.length<2||label.length>100||labels.has(label)||unsafe.test(label)||o.description&&(!o.description.trim()||o.description.length>240||unsafe.test(o.description)))throw Error('Scaffold option content is invalid.');labels.add(label);if(ranks[o.level]<prior)throw Error('Scaffold levels must be ordered.');prior=ranks[o.level]}
  if(!input.some(x=>x.level==='explore'||x.level==='overview')||input.every(x=>['independent-use','design'].includes(x.level)))throw Error('Scaffold must include an introductory goal.')
- return input.map((o,index)=>({...o,label:o.label.trim(),value:`choice_${index}_${Buffer.from(o.label).toString('base64url').slice(0,12)}`,provenance:'model-suggested' as const}))
+ return input.map((o,index)=>({...o,label:o.label.trim(),...o.description?{description:o.description.trim()}:{},value:`choice_${index}_${Buffer.from(o.label.trim()).toString('base64url').slice(0,12)}`,provenance:'model-suggested' as const}))
 }
 export function scaffoldOptions(input?:readonly ScaffoldOptionInput[]):InterviewOption[]{const base=input?validateScaffoldOptions(input):GENERIC_GOAL_SCAFFOLD.map((o,index)=>({...o,value:`generic_${index}`,provenance:'host-generic' as const}));return[...base,{label:UNCERTAIN_OPTION_LABEL,value:'recommend_overview',level:'overview',provenance:'host-uncertainty'}]}
