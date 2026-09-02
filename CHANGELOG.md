@@ -1,5 +1,14 @@
 # 变更日志 / Changelog
 
+## 0.10.0 — lesson article generation and export
+
+- Breaking epoch: package 0.10.0, state schema 14, Storage Domain 11; HTTP API v3 gains content actions and routes. Clear only LearnLoop domain data or use an isolated `DSH_HOME`.
+- Passing a verified task records durable teaching segments and a pending capture request; `generate-articles` creates or resumes the single project generation job, materializes the private Lesson Source Snapshot, and wakes the owning Agent through the public Agent handle.
+- New `learnloop_write_lesson_document` tool: the model submits only a structured `LessonDocumentIntent`; the Host validates schema, Markdown safety, privacy, and reference-link provenance, then derives identity, sequence, slug, revision, provenance, and immutable storage.
+- New export pipeline: per-lesson or whole-course export writes Markdown, a static HTML site, PDF (local Chromium-family browser), EPUB, and a combined ZIP into one fresh subdirectory of a learner-chosen directory; export records persist for replay-safe open and download.
+- Plan view gains per-task article status, failure reasons, retry, regenerate, preview, and export controls.
+- Fixed the content repository's Windows directory-sync failure and unified the two divergent canonical-JSON hash implementations.
+
 ## Unreleased — DSH compatibility
 
 - Closed Interview uncertainty and clarification transitions with persisted presentation stages,
