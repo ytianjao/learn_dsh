@@ -7,6 +7,6 @@ export class LearnLoopDomainError extends HarnessError{readonly retryable:boolea
 export const DEFAULT_PREFERENCES:LearningPreferences={mode:'balanced',practiceCapacity:'none',explanationDepth:'standard',exampleDensity:'standard',additionalNotes:''}
 export {canonicalJson}
 export const payloadHash=canonicalHash
-export const learnLoopDomainSpec={name:'learnloop',version:11,tables:{state:{valueSchema:learnLoopStateSchema}}} as const satisfies DomainSpec
-export function emptyState(revision=0):LearnLoopState{return learnLoopStateSchema.parse({schemaVersion:14,revision,settings:{language:'zh-CN',weeklyHours:10,strictness:'balanced',autoMinorAdjustments:true,showModeExplanation:false,antiDependency:true},workspaces:{},commandReceipts:[]})}
+export const learnLoopDomainSpec={name:'learnloop',version:12,tables:{state:{valueSchema:learnLoopStateSchema}}} as const satisfies DomainSpec
+export function emptyState(revision=0):LearnLoopState{return learnLoopStateSchema.parse({schemaVersion:15,revision,settings:{language:'zh-CN',weeklyHours:10,strictness:'balanced',autoMinorAdjustments:true,showModeExplanation:false,antiDependency:true},workspaces:{},commandReceipts:[]})}
 export async function ensureState(table:StateTable){if(!table.get('singleton'))await table.put('singleton',emptyState())}

@@ -2,7 +2,7 @@ import {randomUUID} from 'node:crypto'
 import {LearnLoopDomainError} from '../domain.js'
 import {toolAllowed} from '../tool-protocol.js'
 import type {LearnLoopState,LearningProject,LearningTask} from '../types.js'
-import {applyWorkspaceCommand,activeProject,workspaceForSession,workspaceOf} from '../workspace.js'
+import {applyWorkspaceCommand,activeProject,commandReceiptFor,commandResultFor,workspaceForSession,workspaceOf} from '../workspace.js'
 import {acceptedAssessmentForTask,lessonCaptureForTask,tasksOfPlan} from './capture.js'
 import type {CaptureRequest,ExportRecord,GenerationJob,LessonDocument} from './schemas.js'
 
@@ -25,10 +25,8 @@ function resolveTargets(project:LearningProject,taskId:string|undefined):Learnin
  return tasks
 }
 
-const latestCapture=(project:LearningProject,taskId:string)=>project.content.captureRequests.filter(request=>request.taskId===taskId).at(-1)
-
 function captureFor(project:LearningProject,workspaceId:string,task:LearningTask,plan:{id:string;version:number},attempt:number,at:string):CaptureRequest{
- const prior=latestCapture(project,task.id)
+ const prior=lessonCaptureForTask(project,task.id)
  const accepted=acceptedAssessmentForTask(project,task.id)!
  return{id:uid('capture'),workspaceId,projectId:project.id,planId:plan.id,planVersion:plan.version,taskId:task.id,conceptId:task.conceptId,assessmentId:accepted.id,sourceSegments:prior?.sourceSegments??[],status:'pending',attempt,sourceSnapshotId:null,sourceHash:null,lastError:null,createdAt:at,updatedAt:at}
 }
@@ -52,7 +50,7 @@ export function requestArticleGeneration(state:LearnLoopState,input:ArticleGener
    fail('CONTENT_JOB_ALREADY_RUNNING','Another article generation is already running for this project.')
   }
   const captureRequests=[...content.captureRequests]
-  const ensureCapture=(task:LearningTask)=>{const prior=latestCapture(project,task.id),lesson=project.content.lessons[task.id];if(lesson?.source.status==='ready'&&prior?.status==='ready')return;if(prior?.status==='pending')return;captureRequests.push(captureFor(project,ws.workspaceId,task,plan,(prior?.attempt??0)+1,at))}
+  const ensureCapture=(task:LearningTask)=>{const prior=lessonCaptureForTask(project,task.id),lesson=project.content.lessons[task.id];if(lesson?.source.status==='ready'&&prior?.status==='ready')return;if(prior?.status==='pending')return;captureRequests.push(captureFor(project,ws.workspaceId,task,plan,(prior?.attempt??0)+1,at))}
   let jobs:GenerationJob[],job:GenerationJob
   const failed=active?.status==='failed'?active:content.generationJobs.filter(item=>item.status==='failed').at(-1)??null
   if(failed&&coveredBy(failed)){
@@ -74,8 +72,7 @@ export function requestArticleGeneration(state:LearnLoopState,input:ArticleGener
 
 /** Receipt-aware readback for the HTTP layer: did this request start work the chat turn must drive? */
 export function articleGenerationReceipt(state:LearnLoopState,workspaceId:string,idempotencyKey:string){
- const receipt=state.commandReceipts.find(item=>item.workspaceId===workspaceId&&item.idempotencyKey===idempotencyKey)
- return receipt?.result?.kind==='article-generation-requested'?receipt.result:null
+ return commandResultFor(state,workspaceId,idempotencyKey,'article-generation-requested')
 }
 
 export type LessonCaptureOutcome={status:'ready';sourceSnapshotId:string;sourceHash:string;relativePath:string}|{status:'failed';code:string;message:string}
@@ -140,13 +137,12 @@ export function recordArticleExport(state:LearnLoopState,input:{workspaceId:stri
  },workspace=>({kind:'articles-exported',exportId:input.record.id,scope:input.record.scope,exportDirectory:input.record.exportDirectory,zipFileName:input.record.zipFileName,lessonIds:input.record.lessonIds,workspaceRevision:workspace.revision}))
 }
 
-export const articleExportReceipt=(state:LearnLoopState,workspaceId:string,idempotencyKey:string)=>state.commandReceipts.find(item=>item.workspaceId===workspaceId&&item.idempotencyKey===idempotencyKey&&item.action==='content:export-articles')??null
+export const articleExportReceipt=(state:LearnLoopState,workspaceId:string,idempotencyKey:string)=>{const receipt=commandReceiptFor(state,workspaceId,idempotencyKey);return receipt?.action==='content:export-articles'?receipt:null}
 
 /** Commit a Host-validated lesson document: update the reference and advance the generation job atomically. */
 export function commitLessonDocument(state:LearnLoopState,input:{sessionId:string;callId:string;document:LessonDocument;relativePath:string}){
  const w=workspaceForSession(state,input.sessionId),p=activeProject(w),key=lessonDocumentReceiptKey(input.callId)
- if(!state.commandReceipts.some(r=>r.workspaceId===w.workspaceId&&r.idempotencyKey===key)&&!toolAllowed('learnloop_write_lesson_document',p,'executable'))fail('INVALID_PROJECT_PHASE','This tool is not allowed in the current LearnLoop phase.')
- let committed:{jobId:string;jobStatus:'running'|'completed'|'failed';nextTaskId:string|null}|null=null
+ if(!commandReceiptFor(state,w.workspaceId,key)&&!toolAllowed('learnloop_write_lesson_document',p,'executable'))fail('INVALID_PROJECT_PHASE','This tool is not allowed in the current LearnLoop phase.')
  return applyWorkspaceCommand(state,{workspaceId:w.workspaceId,projectId:p.id,sessionId:input.sessionId,expectedRevision:w.revision,idempotencyKey:key},'content:write-lesson',{taskId:input.document.taskId,contentHash:input.document.contentHash,contentRevision:input.document.contentRevision},(ws,project)=>{
   if(!project)fail('PROJECT_NOT_FOUND','Project missing.')
   const at=now(),content=project.content,job=content.generationJobs.find(item=>item.id===content.activeGenerationJobId)
@@ -156,7 +152,6 @@ export function commitLessonDocument(state:LearnLoopState,input:{sessionId:strin
   const reference={lessonId:lesson.lessonId,contentRevision:input.document.contentRevision,slug:input.document.slug,relativePath:input.relativePath,sourceHash:lesson.source.sourceHash!,contentHash:input.document.contentHash,status:'final' as const,updatedAt:at}
   const nextTaskId=job.pendingTaskIds[0]??null
   const advanced={...job,status:nextTaskId?'running' as const:'completed' as const,completedTaskIds:[...job.completedTaskIds,input.document.taskId],pendingTaskIds:job.pendingTaskIds.slice(1),currentTaskId:nextTaskId,updatedAt:at}
-  committed={jobId:job.id,jobStatus:advanced.status,nextTaskId}
   return{...ws,projects:{...ws.projects,[project.id]:{...project,content:{...content,lessons:{...content.lessons,[input.document.taskId]:{...lesson,documents:{...lesson.documents,shareable:reference},updatedAt:at}},generationJobs:content.generationJobs.map(item=>item.id===job.id?advanced:item),activeGenerationJobId:nextTaskId?job.id:null},updatedAt:at}}}
- },workspace=>({kind:'lesson-document-written',jobId:committed?.jobId??'',taskId:input.document.taskId,lessonId:input.document.id,contentRevision:input.document.contentRevision,jobStatus:committed?.jobStatus??'failed',nextTaskId:committed?.nextTaskId??null,workspaceRevision:workspace.revision}))
+ },workspace=>{const job=workspace.projects[p.id]!.content.generationJobs.filter(item=>item.completedTaskIds.includes(input.document.taskId)).at(-1)!;return{kind:'lesson-document-written',jobId:job.id,taskId:input.document.taskId,lessonId:input.document.id,contentRevision:input.document.contentRevision,jobStatus:job.status==='completed'?'completed':'running',nextTaskId:job.currentTaskId,workspaceRevision:workspace.revision}})
 }

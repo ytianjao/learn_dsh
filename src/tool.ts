@@ -1,6 +1,6 @@
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import { LearnLoopDomainError } from './domain.js'
-import { createPlanDraftFromIntent } from './workspace.js'
+import { commandResultFor, createPlanDraftFromIntent } from './workspace.js'
 import type { StateTable } from './types.js'
 import type {CanonicalWorkspaceContext} from './workspace-identity.js'
 import {encodeToolError,finalizeLearnLoopToolError} from './tool-protocol.js'
@@ -49,9 +49,8 @@ export function createLearnLoopCreatePlanDraftTool(table:StateTable,resolveWorks
     if(identity.sessionId!==sessionId)throw new LearnLoopDomainError('SESSION_MISMATCH','Tool call is not from the active Session.')
     const callId=String(exec.callId)
     const updated=await table.update('singleton',state=>createPlanDraftFromIntent(state,{sessionId,callId,plan:args.plan}))
-    const workspace=updated.workspaces[identity.workspaceId]!
-    const result=updated.commandReceipts.find(receipt=>receipt.workspaceId===identity.workspaceId&&receipt.idempotencyKey===`plan-draft:${callId}`)?.result
-    if(!result||result.kind!=='plan-draft-created')throw new LearnLoopDomainError('INVALID_PLAN','Canonical plan draft receipt is missing.')
+    const result=commandResultFor(updated,identity.workspaceId,`plan-draft:${callId}`,'plan-draft-created')
+    if(!result)throw new LearnLoopDomainError('INVALID_PLAN','Canonical plan draft receipt is missing.')
     return{status:'draft' as const,planId:result.planId,planVersion:result.planVersion}
   }})
 }

@@ -4,9 +4,9 @@ LearnLoop is a local-first learning companion for DSH `0.1.1-rc.2` (baseline `b1
 
 ## Canonical workspace and content model
 
-Persisted schema 14 has one root: `schemaVersion`, `revision`, `settings`, `workspaces`, and scoped `commandReceipts`. Each Workspace owns project identities, `activeProjectId`, `activeSessionId`, revision, and events. Each Project aggregate owns its profile, immutable plan versions, execution, candidates, verified assessments and evidence, mastery, adjustments, misconceptions, review queue, and the content index (lesson references, capture requests, generation jobs, export records). A Session is only the current execution attachment; changing sessions does not move or copy a project.
+Persisted schema 15 has one root: `schemaVersion`, `revision`, `settings`, `workspaces`, and scoped `commandReceipts`. Each Workspace owns project identities, `activeProjectId`, `activeSessionId`, revision, and events. Each Project aggregate owns its profile, immutable plan versions, execution, candidates, verified assessments and evidence, mastery, misconceptions, and the content index (lesson references, capture requests, generation jobs, export records). Task dependencies are derived from plan order. A Session is only the current execution attachment; changing sessions does not move or copy a project.
 
-The HTTP boundary is `/learnloop/api/v3/state`, `/learnloop/api/v3/manage`, `/learnloop/api/v3/export`, `/learnloop/api/v3/lesson` (article preview), and `/learnloop/api/v3/export-file` (ZIP download). State reads are scoped by `workspaceId`; backup format 8 exports only the canonical Workspace aggregate and current settings.
+The HTTP boundary is `/learnloop/api/v3/state`, `/learnloop/api/v3/manage`, `/learnloop/api/v3/export`, `/learnloop/api/v3/lesson` (article preview), and `/learnloop/api/v3/export-file` (ZIP download). State reads are scoped by `workspaceId`; backup format 9 exports only the canonical Workspace aggregate and current settings.
 
 Private lesson source snapshots and canonical lesson documents live as immutable, schema-validated JSON files below `$DSH_HOME/learnloop/content/ws-<hash>/project-<hash>`; main state stores only references and jobs.
 

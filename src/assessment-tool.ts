@@ -1,7 +1,7 @@
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import { LearnLoopDomainError, payloadHash } from './domain.js'
 import type { StateTable, VerifiedTaskAssessment } from './types.js'
-import { activeProject, assessCurrentCandidate, workspaceForSession } from './workspace.js'
+import { activeProject, assessCurrentCandidate, commandReceiptFor, commandResultFor, workspaceForSession } from './workspace.js'
 import {finalizeLearnLoopToolError} from './tool-protocol.js'
 import { resolveCandidateProvenance, type CandidateSessionReader } from './evidence-bridge.js'
 
@@ -38,23 +38,22 @@ export function createLearnLoopAssessmentTool(table: StateTable, sessions: Verif
       const project = activeProject(workspace)
       const idempotencyKey = `assessment:${exec.callId}`
       const fingerprint = payloadHash({ action: 'evidence:assess', workspaceId: workspace.workspaceId, projectId: project.id, payload: args })
-      const receipt = before.commandReceipts.find(item => item.workspaceId === workspace.workspaceId && item.idempotencyKey === idempotencyKey)
+      const receipt = commandReceiptFor(before, workspace.workspaceId, idempotencyKey)
       if (receipt) {
         if (receipt.action !== 'evidence:assess' || receipt.payloadHash !== fingerprint) throw new LearnLoopDomainError('IDEMPOTENCY_KEY_REUSED', 'Assessment call id was reused with different content.')
         if (!receipt.result || receipt.result.kind !== 'assessment-settled') throw new LearnLoopDomainError('ASSESSMENT_INVALID', 'Canonical assessment receipt is missing.')
         const result = receipt.result
         return { status: 'assessed' as const, result: result.result, candidateId: result.candidateId, taskId: result.taskId, taskCompleted: result.taskCompleted, failedCriteria: result.failedCriteria, feedback: result.feedback }
       }
-      const prior = project.assessments.find(item => item.verifier.toolCallId === exec.callId)
-      const candidate = project.evidenceCandidates.find(item => item.id === (project.execution?.candidateId ?? prior?.candidateId))
+      const candidate = project.evidenceCandidates.find(item => item.id === project.execution?.candidateId)
       if (!candidate) throw new LearnLoopDomainError('CANDIDATE_NOT_FOUND', 'Candidate missing.')
       const provenance = resolveCandidateProvenance(candidate, sessionId, sessions)
       const header = sessions.requestHeader(sessionId, exec.callId)
       if (!header) throw new LearnLoopDomainError('CANDIDATE_SOURCE_MISSING', 'Verifier tool call or request header missing.')
       const verifier: VerifiedTaskAssessment['verifier'] = { provider: header.provider, model: header.model, requestEventSeq: header.seq, assistantMessageEventSeq: header.assistantMessageEventSeq, turn: header.turn, step: header.step, toolCallId: exec.callId, policyVersion: 'learnloop-verifier-v1', rubricVersion: 'learnloop-rubric-v1' }
       const updated = await table.update('singleton', state => assessCurrentCandidate(state, { sessionId, idempotencyKey, ...args, verifier, provenance }))
-      const result = updated.commandReceipts.find(item => item.workspaceId === workspace.workspaceId && item.idempotencyKey === idempotencyKey)?.result
-      if (!result || result.kind !== 'assessment-settled') throw new LearnLoopDomainError('ASSESSMENT_INVALID', 'Canonical assessment receipt is missing.')
+      const result = commandResultFor(updated, workspace.workspaceId, idempotencyKey, 'assessment-settled')
+      if (!result) throw new LearnLoopDomainError('ASSESSMENT_INVALID', 'Canonical assessment receipt is missing.')
       return { status: 'assessed' as const, result: result.result, candidateId: result.candidateId, taskId: result.taskId, taskCompleted: result.taskCompleted, failedCriteria: result.failedCriteria, feedback: result.feedback }
     },
   })

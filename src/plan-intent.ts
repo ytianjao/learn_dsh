@@ -44,17 +44,11 @@ export function validatePlanIntent(value: unknown, profile: LearnerProfile): Pla
 export function compilePlanIntent(intent: PlanIntent, profile: LearnerProfile, context: { planVersion: number; createdAt?: string; uuid?: () => string }): PlanVersion {
   const valid = validatePlanIntent(intent, profile)
   const uuid = context.uuid ?? randomUUID
-  let previousTaskId: string | null = null
   return {
     id: `plan_${uuid()}`, version: context.planVersion, status: 'draft', createdAt: context.createdAt ?? new Date().toISOString(),
     stages: valid.stages.map(stage => ({
       id: `stage_${uuid()}`, title: stage.title, outcome: stage.outcome,
-      tasks: stage.tasks.map(task => {
-        const id = `task_${uuid()}`
-        const compiled = { ...task, id, status: 'pending' as const, conceptId: `concept_${uuid()}`, dependsOnTaskIds: previousTaskId ? [previousTaskId] : [] }
-        previousTaskId = id
-        return compiled
-      }),
+      tasks: stage.tasks.map(task => ({ ...task, id: `task_${uuid()}`, status: 'pending' as const, conceptId: `concept_${uuid()}` })),
     })),
   }
 }

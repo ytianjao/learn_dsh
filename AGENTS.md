@@ -5,7 +5,7 @@ about the project. Read this before changing code.
 
 ## 1. Project overview
 
-- **Package:** `@learnloop/dsh-learnloop` (version `0.10.0`, MIT license, pure ESM —
+- **Package:** `@learnloop/dsh-learnloop` (version `0.11.0`, MIT license, pure ESM —
   `"type": "module"`).
 - **What it is:** LearnLoop is a **local-first, long-term learning companion** delivered as
   a plugin for **DeepSeek Harness (DSH) Web**. It guides a learner through a profile
@@ -21,7 +21,7 @@ about the project. Read this before changing code.
 
 DSH owns sessions, streaming Chat, model routing, the tool-execution runtime, and **all
 model credentials**. LearnLoop owns only the learning domain facts: projects, profiles,
-plans, evidence, mastery, review state, adjustments, and generated content.
+plans, evidence, mastery, review state, and generated content.
 
 **LearnLoop never reads API keys, never implements a model-provider client, and never
 calls a provider directly.** The model only ever acts through the registered LearnLoop
@@ -105,20 +105,21 @@ result instead of re-executing).
 
 ## 5. Persistence & state model
 
-- **Storage Domain** `learnloop`, version `11`, one table `state`, one row `singleton`.
-- **State schema 14** (`learnLoopStateSchema` in `src/types.ts`): root is exactly
+- **Storage Domain** `learnloop`, version `12`, one table `state`, one row `singleton`.
+- **State schema 15** (`learnLoopStateSchema` in `src/types.ts`): root is exactly
   `{ schemaVersion, revision, settings, workspaces, commandReceipts }`. All schemas use
   `.strict()`; unknown keys are rejected.
 - **Hierarchy:** `workspaces[workspaceId]` → `projects[projectId]`. A **Project** is the
   aggregate that owns its profile, immutable plan versions, execution, evidence candidates,
-  verified assessments/evidence, mastery, adjustments, misconceptions, review queue, and a
+  verified assessments/evidence, mastery, misconceptions, and a
   content index. A **Session** is only the current execution attachment — changing sessions
-  does not move or copy a project.
+  does not move or copy a project. Task dependencies are derived from plan order; tasks
+  carry no explicit dependency field.
 - **Content files:** private lesson source snapshots and canonical lesson documents are
   immutable, schema-validated JSON files stored under
   `$DSH_HOME/learnloop/content/ws-<hash>/project-<hash>` via `ContentRepository`. Main state
   stores only references, capture requests, generation jobs, and export records.
-- **Backup format 8** (`BACKUP_FORMAT_VERSION` in `src/http.ts`) exports only the canonical
+- **Backup format 9** (`BACKUP_FORMAT_VERSION` in `src/http.ts`) exports only the canonical
   Workspace aggregate plus current settings.
 
 ### Breaking epochs
@@ -256,7 +257,7 @@ pnpm run acceptance:reset        # clean up the isolated acceptance profile
   surrounding style; do not reformat existing code.
 - **Lint:** only `no-constant-condition` is enabled as an error, with `--max-warnings 0`.
 - **Immutability:** domain commands return new state objects (spread/map), never mutate in
-  place; plans are immutable versions (revert uses inverse operations).
+  place; plans are immutable versions.
 - **Errors:** throw `LearnLoopDomainError` with a stable `LearnLoopErrorCode`; keep the
   code list in `src/types.ts` and the `statusByCode` map in `src/http.ts` in sync.
 - **Language of artifacts:** code comments and identifiers are English. User-facing web

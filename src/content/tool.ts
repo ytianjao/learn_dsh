@@ -4,7 +4,7 @@ import {LearnLoopDomainError} from '../domain.js'
 import type {LearnLoopSessionReader} from '../dsh-session-adapter.js'
 import {finalizeLearnLoopToolError} from '../tool-protocol.js'
 import type {StateTable} from '../types.js'
-import {activeProject,workspaceForSession} from '../workspace.js'
+import {activeProject,commandReceiptFor,commandResultFor,workspaceForSession} from '../workspace.js'
 import {privateValuesForLesson,tasksOfPlan} from './capture.js'
 import {deriveLessonDocument,lessonDocumentRelativePath,validateLessonDocumentIntent} from './document.js'
 import {activeGenerationJob,commitLessonDocument,lessonDocumentReceiptKey} from './generation.js'
@@ -43,7 +43,7 @@ export function createLearnLoopWriteLessonDocumentTool(table:StateTable,sessions
   const before=table.get('singleton')
   if(!before)throw new LearnLoopDomainError('PROJECT_NOT_FOUND','State missing.')
   const workspace=workspaceForSession(before,sessionId),project=activeProject(workspace)
-  const receipt=before.commandReceipts.find(item=>item.workspaceId===workspace.workspaceId&&item.idempotencyKey===lessonDocumentReceiptKey(callId))
+  const receipt=commandReceiptFor(before,workspace.workspaceId,lessonDocumentReceiptKey(callId))
   if(receipt){
    if(receipt.action!=='content:write-lesson')throw new LearnLoopDomainError('IDEMPOTENCY_KEY_REUSED','The lesson document callId was reused with different content.')
    if(receipt.result?.kind!=='lesson-document-written')throw new LearnLoopDomainError('CONTENT_DOCUMENT_NOT_FOUND','Canonical lesson receipt is missing.')
@@ -72,8 +72,8 @@ export function createLearnLoopWriteLessonDocumentTool(table:StateTable,sessions
   const relativePath=lessonDocumentRelativePath(document)
   await repository.atomicWriteJsonIdempotent(relativePath,document,lessonDocumentSchema)
   const updated=await table.update('singleton',state=>commitLessonDocument(state,{sessionId,callId,document,relativePath}))
-  const result=updated.commandReceipts.find(item=>item.workspaceId===workspace.workspaceId&&item.idempotencyKey===lessonDocumentReceiptKey(callId))?.result
-  if(!result||result.kind!=='lesson-document-written')throw new LearnLoopDomainError('CONTENT_DOCUMENT_NOT_FOUND','Canonical lesson receipt is missing.')
+  const result=commandResultFor(updated,workspace.workspaceId,lessonDocumentReceiptKey(callId),'lesson-document-written')
+  if(!result)throw new LearnLoopDomainError('CONTENT_DOCUMENT_NOT_FOUND','Canonical lesson receipt is missing.')
   let failure:string|undefined,jobStatus=result.jobStatus
   if(result.jobStatus==='running'&&result.nextTaskId){
    const fresh=table.get('singleton')!,freshProject=activeProject(workspaceForSession(fresh,sessionId)),capture=freshProject.content.captureRequests.filter(item=>item.taskId===result.nextTaskId&&item.status!=='ready').at(-1)

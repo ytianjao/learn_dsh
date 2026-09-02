@@ -1,5 +1,12 @@
 # 变更日志 / Changelog
 
+## 0.11.0 — domain model cleanup
+
+- Breaking epoch: package 0.11.0, state schema 15, Storage Domain 12, backup format 9. Clear only LearnLoop domain data or use an isolated `DSH_HOME`.
+- Removed the never-executed plan-adjustment and review-queue models from the persisted schema, and dropped the single-variant discriminator fields on assessments, evidence, and evidence sources. / 从持久化 schema 中移除从未实现的计划调整与复盘队列模型，并删除评估、证据及其来源上的单值判别字段。
+- Task dependencies are now derived from plan order; the redundant per-task `dependsOnTaskIds` field (an array capped at one) was removed, and the same plan-order derivation drives `nextAction`, dependency checks, and safe restore. / 任务依赖改为完全由计划顺序推导；移除冗余且上限为 1 的 `dependsOnTaskIds` 字段，`nextAction`、依赖检查与安全恢复共用同一推导。
+- Centralized idempotent command-receipt readback (`commandReceiptFor` / `commandResultFor`) across all model tools and the content pipeline, replacing per-site receipt scans and closure side channels. / 统一各模型工具与内容管线的幂等回执读取（`commandReceiptFor` / `commandResultFor`），取代分散的查找与闭包旁路。
+
 ## 0.10.0 — lesson article generation and export
 
 - Breaking epoch: package 0.10.0, state schema 14, Storage Domain 11; HTTP API v3 gains content actions and routes. Clear only LearnLoop domain data or use an isolated `DSH_HOME`.
