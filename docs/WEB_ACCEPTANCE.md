@@ -13,7 +13,6 @@ The keyless browser lane checks out the immutable Harness commit from
 
 - 在 Settings → LearnLoop 将语言切换到 English，确认 onboarding、导航、任务、三个视图、错误和设置均切换；再切回简体中文 / Switch to English and verify onboarding, navigation, task, all three views, errors, and settings; then switch back.
 - 同时从两个页面提交 mutation，确认一个成功且另一个显示 revision conflict / Submit concurrent mutations from two pages and confirm one succeeds while the other shows a revision conflict.
-- 应用重大结构化调整，确认 active plan 内容和版本变化；撤销后确认内容恢复且产生新版本 / Apply a major structured adjustment, verify content and version changes, then revert and verify restored content in another version.
 - reset 后刷新并确认项目为空且旧页面 mutation 被拒绝 / Reset, refresh to an empty project, and confirm mutations from an old page are rejected.
 - 导出 JSON 并确认浏览器未暴露 DSH 模型凭据 / Export JSON and confirm no DSH model credentials are exposed.
 
@@ -47,7 +46,7 @@ A LearnLoop Workspace may attach its active Project to the current DSH Session f
 
 Task status changes are available only through semantic commands: start, pause, resume, skip, safe restore, and atomic completion with evidence. A blocked task remains the current learning position; only completed or skipped dependencies are satisfied, and skipping never means mastery. Completing a task does not auto-start its successor.
 
-Invariants: `project.sessionId === mutation.sessionId`; active and blocked current tasks cannot coexist; `foreign => no project, plan, evidence, mastery, assessment, adjustment, or event content`.
+Invariants: `project.sessionId === mutation.sessionId`; active and blocked current tasks cannot coexist; `foreign => no project, plan, evidence, mastery, assessment, or event content`.
 
 ## Browser trust boundary
 The web client may call only begin/cancel check for verification. It never sends confidence, message identifiers, event sequence, criterion result, or task completion. Owner export uses the dedicated export endpoint; settings-only and foreign views cannot download a project.
@@ -55,7 +54,7 @@ The web client may call only begin/cancel check for verification. It never sends
 
 ## Canonical persistence boundary (0.2.0)
 
-Schema 8 stores business data only at `workspaces[workspaceId].projects[projectId]`. Projects independently own profile, plans, execution, candidates, verified evidence and assessments, mastery, adjustments, and review state. `activeSessionId` is an execution attachment, not ownership. API v3 reads by Workspace; storage domain 5 rejects earlier LearnLoop states. No code automatically resets or deletes DSH data.
+Schema 15 stores business data only at `workspaces[workspaceId].projects[projectId]`. Projects independently own profile, plans, execution, candidates, verified evidence and assessments, mastery, and misconceptions. `activeSessionId` is an execution attachment, not ownership. API v3 reads by Workspace; storage domain 12 rejects earlier LearnLoop states. No code automatically resets or deletes DSH data.
 
 ## Current LearnLoop interaction protocol
 

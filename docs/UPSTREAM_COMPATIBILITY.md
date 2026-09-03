@@ -32,7 +32,7 @@ A LearnLoop Workspace may attach its active Project to the current DSH Session f
 
 Task status changes are available only through semantic commands: start, pause, resume, skip, safe restore, and atomic completion with evidence. A blocked task remains the current learning position; only completed or skipped dependencies are satisfied, and skipping never means mastery. Completing a task does not auto-start its successor.
 
-Invariants: `project.sessionId === mutation.sessionId`; active and blocked current tasks cannot coexist; `foreign => no project, plan, evidence, mastery, assessment, adjustment, or event content`.
+Invariants: `project.sessionId === mutation.sessionId`; active and blocked current tasks cannot coexist; `foreign => no project, plan, evidence, mastery, assessment, or event content`.
 
 ## Typed Session integration
 Verified-answer integration is constrained to pinned DSH 0.1.1-rc.2 public agent/session/tool surfaces: waterfall pre-step decisions, direct user-message source kinds, public Session events, and tool execution agent/call/signal provenance. DSH source and provider credentials remain untouched.
@@ -40,7 +40,7 @@ Verified-answer integration is constrained to pinned DSH 0.1.1-rc.2 public agent
 
 ## Canonical persistence boundary (0.2.0)
 
-Schema 8 stores business data only at `workspaces[workspaceId].projects[projectId]`. Projects independently own profile, plans, execution, candidates, verified evidence and assessments, mastery, adjustments, and review state. `activeSessionId` is an execution attachment, not ownership. API v3 reads by Workspace; storage domain 5 rejects earlier LearnLoop states. No code automatically resets or deletes DSH data.
+Schema 15 stores business data only at `workspaces[workspaceId].projects[projectId]`. Projects independently own profile, plans, execution, candidates, verified evidence and assessments, mastery, and misconceptions. `activeSessionId` is an execution attachment, not ownership. API v3 reads by Workspace; storage domain 12 rejects earlier LearnLoop states. No code automatically resets or deletes DSH data.
 
 ## rc.8 Tool schema audit for Plan Intent
 

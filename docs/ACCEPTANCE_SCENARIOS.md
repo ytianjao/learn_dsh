@@ -11,8 +11,6 @@ Complete `docs/CLOUD_ACCEPTANCE.md` first. Record the PR commit, DSH baseline, b
 | 学习对话 / Learning conversation | 自动通道使用 mock；可选人工通道在 DSH Chat 发一条教学问题 / CI uses mock; optionally send one teaching question in DSH Chat | Mock 返回固定响应；人工通道流式完成且 LearnLoop 不接触 key / Mock returns fixed text; optional live stream completes and LearnLoop never receives the key |
 | 证据更新 / Evidence update | 在当前任务选择“完成并提交证据”，输入自己的解释 / Complete the current task and submit the learner's explanation | Evidence 出现在进度与复盘；只点击完成不会单独提升掌握度 / Evidence appears in Progress and Review; completion alone does not raise mastery |
 | 进度更新 / Progress update | 提交足够的不同证据并展开概念 / Submit diverse evidence and expand the concept | 掌握度按 introduced → practicing → demonstrated → mastered 离散变化，并列出依据 / Discrete levels and rationale follow the evidence rules |
-| 小调整 / Minor adjustment | 产生或注入一个 update/move 小调整 / Produce or fixture a minor update/move operation | 启用自动小调整时生成新 active version，旧版本 superseded，内容真正改变 / New active version is created and content actually changes |
-| 重大调整批准 / Major approval | 提交 major proposal，在计划页先观察再批准 / Submit a major proposal, inspect it, then approve | 批准前计划不变；批准后新版本生效；revert 再产生恢复版本 / No pre-approval change; apply and revert each create immutable versions |
 | 刷新恢复 / Refresh recovery | 记录项目、任务和证据后刷新浏览器 / Refresh after project, task, and evidence writes | project、active plan、evidence、mastery 和语言设置保持 / Project, plan, evidence, mastery, and language persist |
 | DSH 重启恢复 / DSH restart | `Ctrl+C` 停止，再运行 `pnpm run acceptance:web` / Stop and restart with the same command | 使用相同隔离 DSH_HOME 恢复全部状态 / All state returns from the same isolated DSH_HOME |
 | Provider 错误 / Provider error | 在 keyless E2E 将 mock sequence 改为 `auth_error` 或 `server_error` 后提问 / Run a local mock error behavior and send a prompt | DSH 显示可操作错误，不出现部分成功；LearnLoop 页面仍可用 / Actionable error, no false success, LearnLoop remains usable |
@@ -48,7 +46,7 @@ A LearnLoop Workspace may attach its active Project to the current DSH Session f
 
 Task status changes are available only through semantic commands: start, pause, resume, skip, safe restore, and atomic completion with evidence. A blocked task remains the current learning position; only completed or skipped dependencies are satisfied, and skipping never means mastery. Completing a task does not auto-start its successor.
 
-Invariants: `project.sessionId === mutation.sessionId`; active and blocked current tasks cannot coexist; `foreign => no project, plan, evidence, mastery, assessment, adjustment, or event content`.
+Invariants: `project.sessionId === mutation.sessionId`; active and blocked current tasks cannot coexist; `foreign => no project, plan, evidence, mastery, assessment, or event content`.
 
 ## Verified answer scenario
 Arm the active task, answer in normal Chat, observe needs-work without evidence/completion, arm again, answer correctly, then observe one atomic passed settlement. Confirm the successor stays pending until explicit start and a foreign Session sees no private projection.
@@ -56,7 +54,7 @@ Arm the active task, answer in normal Chat, observe needs-work without evidence/
 
 ## Canonical persistence boundary (0.2.0)
 
-Schema 8 stores business data only at `workspaces[workspaceId].projects[projectId]`. Projects independently own profile, plans, execution, candidates, verified evidence and assessments, mastery, adjustments, and review state. `activeSessionId` is an execution attachment, not ownership. API v3 reads by Workspace; storage domain 5 rejects earlier LearnLoop states. No code automatically resets or deletes DSH data.
+Schema 15 stores business data only at `workspaces[workspaceId].projects[projectId]`. Projects independently own profile, plans, execution, candidates, verified evidence and assessments, mastery, and misconceptions. `activeSessionId` is an execution attachment, not ownership. API v3 reads by Workspace; storage domain 12 rejects earlier LearnLoop states. No code automatically resets or deletes DSH data.
 
 ## Current LearnLoop interaction protocol
 
