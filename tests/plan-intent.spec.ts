@@ -12,14 +12,13 @@ function planning() {
   return confirmWorkspaceProfile(state, { workspaceId: 'ws', projectId, sessionId: 'session', profileRevision: 1, expectedRevision: 2, idempotencyKey: 'confirm' })
 }
 describe('Plan Intent compiler', () => {
-  it('generates canonical identities and a deterministic linear DAG', () => {
+  it('generates canonical identities in a deterministic linear order', () => {
     const state = planning(), profile = activeProject(workspaceOf(state, 'ws')).profile!
     const plan = compilePlanIntent(intent, profile, { planVersion: 1, createdAt: '2026-01-01T00:00:00.000Z', uuid: (() => { let n = 0; return () => String(++n) })() })
     const tasks = plan.stages.flatMap(stage => stage.tasks)
     expect(plan).toMatchObject({ id: 'plan_1', status: 'draft', version: 1 })
     expect(tasks.map(task => task.status)).toEqual(['pending', 'pending'])
-    expect(tasks[0]!.dependsOnTaskIds).toEqual([])
-    expect(tasks[1]!.dependsOnTaskIds).toEqual([tasks[0]!.id])
+    expect(tasks.map(task => task.title)).toEqual(['Explain state', 'Worked recovery'])
     expect(tasks.every(task => task.id.startsWith('task_') && task.conceptId.startsWith('concept_'))).toBe(true)
   })
   it('atomically publishes and payload-binds call id replay', () => {

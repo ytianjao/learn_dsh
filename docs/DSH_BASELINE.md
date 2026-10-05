@@ -2,8 +2,8 @@
 
 ## 固定版本 / Pinned version
 
-- DSH release / DSH 版本：`0.1.1-rc.2`
-- Baseline commit / 基线提交：`b150a551b8d465e31e418e1b2eaf5e79bbb7d28e`
+- DSH release / DSH 版本：`0.2.1-alpha.1`（源码检出跟随最新版 / tracked at the linked source checkout）
+- Baseline commit / 基线提交：`5badb15009ae1756c3afe0ae0cef1faafc290ccc`
 - Node：`^22.19.0 || >=24`
 
 LearnLoop 只依赖公开 Host seams：Cordis Context、Storage Domain 与 Host Web Server；Client 通过 DSH Web slots 注册视图、输入 dock 和设置。

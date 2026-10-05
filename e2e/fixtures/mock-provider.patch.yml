@@ -1,4 +1,19 @@
 # Keyless local provider for PR browser tests. / PR 浏览器测试使用的无密钥本机 provider。
+# Pin the in-app browsing directory picker: loopback + Windows would otherwise mount
+# the native OS chooser, which browser automation cannot drive. An overlay cannot
+# rename a row (the Loader skips name mismatches), so disable -auto and insert the
+# browse backend + surface pair directly. / 固定为应用内目录浏览对话框：回环地址 +
+# Windows 默认挂载操作系统原生选择器，浏览器自动化无法驱动。overlay 不能改行的
+# name（Loader 会跳过不匹配的 name），因此禁用 -auto 并直接插入 browse 后端与界面。
+- id: directory-picker
+  disabled: true
+
+- insert:
+    - id: directory-picker-browse-backend
+      name: '@deepseek-ai/dsh-host-directory-picker-browse'
+    - id: directory-picker-browse-surface
+      name: '@deepseek-ai/dsh-client-ui-directory-picker-browse'
+
 - id: agent-default-model
   config:
     provider: learnloop-mock
@@ -11,6 +26,11 @@
         displayName: LearnLoop CI Mock
         api: openai-completions
         baseURL: http://127.0.0.1:8000/v1
+        # 0.2.x requires credentials for every provider; the keyless mock authenticates
+        # through a static header instead of a real API key. / 0.2.x 对所有 provider
+        # 都要求凭据；无密钥 mock 用静态头满足认证，无需真实 API key。
+        headers:
+          Authorization: Bearer learnloop-mock
         models:
           - id: mock-model
             name: Mock Model

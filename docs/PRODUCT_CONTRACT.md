@@ -1,14 +1,14 @@
 # 产品契约 / Product contract
 
 > Runtime baseline: all directly consumed Harness packages are pinned to the single
-> `0.1.1-rc.2` family recorded in `scripts/dsh-baseline.json`. This maintenance upgrade does
+> `0.2.1-alpha.1` family recorded in `scripts/dsh-baseline.json`. This maintenance upgrade does
 > not change LearnLoop state schema, product fields, or HTTP API v3.
 
 ## 产品边界 / Product boundary
 
-DSH 负责会话、流式 Chat、模型路由和凭据；LearnLoop 负责学习项目、计划、证据、掌握度、复盘和调整事实。LearnLoop 不实现模型提供商客户端。
+DSH 负责会话、流式 Chat、模型路由和凭据；LearnLoop 负责学习项目、计划、证据、掌握度和复盘事实。LearnLoop 不实现模型提供商客户端。
 
-DSH owns sessions, streaming Chat, model routing, and credentials. LearnLoop owns learning projects, plans, evidence, mastery, review, and adjustment facts. LearnLoop does not implement a model-provider client.
+DSH owns sessions, streaming Chat, model routing, and credentials. LearnLoop owns learning projects, plans, evidence, mastery, and review facts. LearnLoop does not implement a model-provider client.
 
 ## 浏览器体验 / Browser experience
 
@@ -22,19 +22,15 @@ Empty, waiting-for-model, loading, disconnected, and conflict states must offer 
 
 ## 学习规则 / Learning rules
 
-用户解释、伪代码、实现、假设、评测或反思只有在包含来源范围和幂等键时才可作为证据。模型解释、“懂了”、停留时间或完成按钮本身不是证据。
+经过验证的评测只有在包含来源范围和幂等键时才可作为证据。模型解释、“懂了”、停留时间或完成按钮本身不是证据。
 
-A learner explanation, pseudocode, implementation, hypothesis, assessment, or reflection qualifies as evidence only with a source range and idempotency key. Model explanations, “I understand,” time on page, and the completion button alone are not evidence.
+A verified assessment qualifies as evidence only with a source range and idempotency key. Model explanations, “I understand,” time on page, and the completion button alone are not evidence.
 
-概念进入计划后为 introduced；一条证据为 practicing；两条高置信证据为 demonstrated；三条高置信证据且包含 assessment 或 implementation 才是 mastered。任务完成与掌握度相互独立。
+概念进入计划后为 introduced；一条证据为 practicing；两条高置信证据为 demonstrated；三条高置信证据且包含 assessment 才是 mastered。任务完成与掌握度相互独立。
 
-A concept in the plan is introduced; one evidence item means practicing; two high-confidence items mean demonstrated; mastery requires three high-confidence items including an assessment or implementation. Task completion and mastery remain independent.
+A concept in the plan is introduced; one evidence item means practicing; two high-confidence items mean demonstrated; mastery requires three high-confidence items including an assessment. Task completion and mastery remain independent.
 
-## 调整与一致性 / Adjustments and consistency
-
-调整必须同时携带人类可读 diff 和可执行结构化操作。小调整可以自动应用；大调整必须批准。应用与撤销都创建新的不可变计划版本，撤销使用应用时保存的逆操作。
-
-An adjustment must carry both a human-readable diff and executable structured operations. Minor adjustments may apply automatically; major adjustments require approval. Apply and revert both create immutable plan versions, with revert using inverse operations captured at apply time.
+## 一致性与权威 / Consistency and authority
 
 Host 是唯一权威状态。每个 mutation 在原子更新中检查单调 revision，并以幂等键安全处理重试。reset 不得令 revision 回退。
 
@@ -74,7 +70,7 @@ A LearnLoop Workspace may attach its active Project to the current DSH Session f
 
 Task status changes are available only through semantic commands: start, pause, resume, skip, safe restore, and atomic completion with evidence. A blocked task remains the current learning position; only completed or skipped dependencies are satisfied, and skipping never means mastery. Completing a task does not auto-start its successor.
 
-Invariants: `project.sessionId === mutation.sessionId`; active and blocked current tasks cannot coexist; `foreign => no project, plan, evidence, mastery, assessment, adjustment, or event content`.
+Invariants: `project.sessionId === mutation.sessionId`; active and blocked current tasks cannot coexist; `foreign => no project, plan, evidence, mastery, assessment, or event content`.
 
 ## Verified answer invariants
 - **Candidate provenance:** every `candidate.source.messageIds` identifies a real DSH `user/message` in `project.sessionId`.
@@ -89,7 +85,7 @@ Verified Answer Loop v1 accepts text only. It does not automatically verify imag
 
 ## Canonical persistence boundary (0.2.0)
 
-Schema 8 stores business data only at `workspaces[workspaceId].projects[projectId]`. Projects independently own profile, plans, execution, candidates, verified evidence and assessments, mastery, adjustments, and review state. `activeSessionId` is an execution attachment, not ownership. API v3 reads by Workspace; storage domain 5 rejects earlier LearnLoop states. No code automatically resets or deletes DSH data.
+Schema 15 stores business data only at `workspaces[workspaceId].projects[projectId]`. Projects independently own profile, plans, execution, candidates, verified evidence and assessments, mastery, and misconceptions. `activeSessionId` is an execution attachment, not ownership. API v3 reads by Workspace; storage domain 12 rejects earlier LearnLoop states. No code automatically resets or deletes DSH data.
 
 ## Canonical Plan Intent contract (0.5.0)
 
@@ -127,4 +123,4 @@ Onboarding uses one persisted interview topic at a time. Profile and Plan review
 
 # Product Contract
 
-LearnLoop is learner-first: it stores the learner's raw subject before creating planning structure. Internal classifications never become the first question. DSH native custom input is a supported protocol path. Probes express Host information needs rather than a rigid form. Recommendations and learner evidence have distinct origins and remain reviewable. Runtime V6 tokenizes stateful Tool calls and reserves ordinary Chat for explicit Host fallback. Content Runtime and static publishing are out of scope.
+LearnLoop is learner-first: it stores the learner's raw subject before creating planning structure. Internal classifications never become the first question. DSH native custom input is a supported protocol path. Probes express Host information needs rather than a rigid form. Recommendations and learner evidence have distinct origins and remain reviewable. Runtime V6 tokenizes stateful Tool calls and reserves ordinary Chat for explicit Host fallback. The content runtime generates Host-validated lesson articles through `learnloop_write_lesson_document` and exports them as Markdown, a static HTML site, PDF, EPUB, and a combined ZIP.

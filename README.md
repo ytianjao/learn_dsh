@@ -1,70 +1,52 @@
 # LearnLoop for DeepSeek Harness
 
-LearnLoop is a local-first learning companion for DSH `0.1.1-rc.2` (baseline `b150a551b8d465e31e418e1b2eaf5e79bbb7d28e`). It requires Node `^22.19.0 || >=24` and pnpm `11.7.0`. LearnLoop never reads or manages model credentials.
+LearnLoop is a local-first, long-term learning companion for DeepSeek Harness (DSH) Web: a guided profile interview, a validated learning plan, task-by-task teaching with verified answers, mastery tracking, and lesson article generation/export. It follows the latest DSH source checkout (`scripts/dsh-baseline.json`, currently `0.2.1-alpha.1`) and never reads or manages model credentials.
 
-## Canonical workspace and content model
+## Requirements
 
-Persisted schema 12 has one root: `schemaVersion`, `revision`, `settings`, `workspaces`, and scoped `commandReceipts`. Each Workspace owns project identities, `activeProjectId`, `activeSessionId`, revision, and events. Each Project aggregate owns its profile, immutable plan versions, execution, candidates, verified assessments and evidence, mastery, adjustments, misconceptions, and review queue. A Session is only the current execution attachment; changing sessions does not move or copy a project.
+- Node `^22.19.0 || >=24`, pnpm `11.7.0` (via `corepack enable`)
+- The DeepSeek Harness source checkout at `./deepseek-harness` — every `@deepseek-ai/dsh*` dev dependency links to it, so the plugin and the Host share one physical module copy.
 
-The HTTP boundary is `/learnloop/api/v3/state`, `/learnloop/api/v3/manage`, and `/learnloop/api/v3/export`. State reads are scoped by `workspaceId`; backup format 3 exports only the canonical Workspace aggregate and current settings.
-
-## Install and verify
+## Install from zero / 从零安装
 
 ```bash
-corepack enable
-pnpm install --frozen-lockfile
-pnpm run build
-pnpm run typecheck
-pnpm run lint
-pnpm test
+# 1. Place and build the Harness checkout / 放入并构建 Harness 源码检出
+git clone https://github.com/deepseek-ai/deepseek-harness.git deepseek-harness
+#    or link an existing checkout / 或链接已有检出：
+#    Windows: cmd /c mklink /J deepseek-harness D:\path\to\deepseek-harness
+#    macOS/Linux: ln -s /path/to/deepseek-harness deepseek-harness
+pnpm --dir deepseek-harness install && pnpm --dir deepseek-harness run build
+
+# 2. Install and build the plugin / 安装并构建插件
+pnpm install && pnpm run build
+
+# 3. Register into the web profile and start / 注册进 web profile 并启动
+pnpm exec dsh plugin --profile web add .
+pnpm exec dsh web        # open the printed http://127.0.0.1:3080/?token=... URL / 打开打印的带 token 的地址
 ```
 
-Install with `dsh plugin --profile web add .`, then start `dsh web`. Users explicitly select **开启学习模式 / Start learning mode**, complete the native guided interview, confirm the profile, review a draft, and approve it before teaching begins.
+Then click **开启学习模式 / Start learning mode** in the UI.
 
-## Verified Answer Loop
+## Verify
 
-A formal check captures the next direct DSH user message in the active Workspace Project. `learnloop_assess_answer` validates every criterion. `needs-work` keeps the task active and creates no Evidence. `passed` or `excellent` atomically writes the Assessment, Evidence, Mastery change, and task completion. The next task still requires explicit start.
+```bash
+pnpm run check                # typecheck + client syntax + all tests
+pnpm run lint
+pnpm run verify:dsh-baseline  # peer strings, link targets, checkout drift, lockfile, workflow
+pnpm run e2e:keyless:web      # full browser flow against a deterministic mock provider
+```
 
-## Breaking upgrade from pre-canonical builds
+## After editing / 修改后更新
 
-Pre-canonical persisted states and backup format 1 are intentionally unsupported; no automatic migration, reset, or deletion occurs.
+- `src/**`: `pnpm run build`, then restart `dsh web` — the profile links the plugin in place, so there is nothing to reinstall or re-register. / 改源码后重新构建并重启服务即可，链接都是活路径，无需重装或重新注册。
+- `client/bundle.js`: reload the browser page. / 改客户端 bundle 后刷新页面。
+- Dependency changes: `pnpm install`. / 依赖变更后重新 install。
+- `./deepseek-harness` moved forward: rebuild it, then `pnpm run verify:dsh-baseline` (bump `scripts/dsh-baseline.json` on drift, see `AGENTS.md` §13). / Harness 检出前进后重新构建并校验基线。
 
-1. Stop DSH.
-2. Back up the complete `DSH_HOME` if an audit copy is needed.
-3. Remove only LearnLoop's Storage Domain data using a DSH-supported domain reset facility.
-4. Do **not** delete model credentials, Workspace/Session data, other plugin data, or the whole `DSH_HOME`.
-5. Restart DSH and create projects again from **开启学习模式**.
+## Use
 
-The pinned DSH release does not expose a documented, safe command for selectively deleting one plugin domain. Consequently this project does not publish a destructive filesystem command. If selective cleanup cannot be established safely, start DSH with a new isolated `DSH_HOME` and retain the old directory as a backup.
+- **Interview:** the first question (“你现在想学什么？”) is free text; every later question is option-based — the model analyzes the subject and prior answers, then proposes beginner-friendly options, while custom text always remains valid. Confirm the generated Profile in the LearnLoop Profile view.
+- **Plan and tasks:** review and approve the draft plan, then start each task explicitly. A formal check captures the next learner answer and validates every acceptance criterion; passing writes assessment, evidence, and mastery atomically.
+- **Articles:** after a task passes, generate a lesson article from the Plan view and export Markdown, a static HTML site, PDF, EPUB, or a combined ZIP.
 
-## Breaking upgrade to 0.5.0
-
-The model-facing planning contract is **Plan Intent only**. Workspace, Project, revisions,
-idempotency, IDs, dependencies, and status are Host-owned. Canonical task verification is
-text-only; artifact, file, upload, and repository verification are not supported.
-
-State schema 8, Storage Domain version 2, HTTP API v2, backup format 2, and the former plan
-Tool are rejected and have no migration or alias. Stop DSH, then either use a fresh isolated
-`DSH_HOME` or clear only the LearnLoop Storage Domain. Do not delete model credentials,
-Workspaces, Sessions, or unrelated plugin data. Restart DSH and enable learning mode again.
-
-### Agent protocol
-
-The **Start learning mode** button is the only activation boundary: the Host creates an `interviewing` Project before submitting “开始建立我的学习档案。 / Start building my learning profile.” No onboarding tool is exposed to the model. DSH 0.1.1-rc.2 registers tools globally, so LearnLoop publishes an exact phase allow-list in each system prompt and independently enforces it at the Tool executor/domain boundary. Plan approval activates the plan but leaves every task pending; the learner must explicitly start the first task in LearnLoop.
-
-
-## Learning content epoch (0.6.0)
-
-State schema 9, Storage Domain 6 and backup format 4 are a clean breaking epoch. Clear only the LearnLoop Storage Domain (or use a fresh isolated `DSH_HOME`); never delete credentials, Sessions, other plugins, or the whole DSH home. LearnLoop stores private source snapshots and canonical lesson JSON below an opaque hashed content path. HTML/static-site export is not included.
-
-## 0.7.0 host-authoritative onboarding
-
-Runtime V4 resolves `AssembleContext.agent.id`, persists a one-topic-at-a-time evidence-backed interview, and moves Profile/Plan approval to explicit LearnLoop UI HTTP actions. Schema 10, Storage Domain 7, and backup 5 are a clean epoch; clear only LearnLoop data. Static HTML publication remains out of scope.
-
-## 0.8.0 adaptive interview contract
-
-An Interview Topic is not one question. A required **Probe** is the smallest Host-verifiable information slot, and a non-empty answer does not by itself complete a Topic. The Host owns Probe progression and compiles the Profile from learner evidence; the model cannot submit a complete Profile. Profile and Plan approval are direct View actions. Canonical `LessonDocument` JSON remains the learning-content fact source; HTML publication is a later release.
-
-## 0.9 learner-first Profile interview
-
-Profile onboarding starts with **“你现在想学什么？ / What would you like to learn?”** and accepts the learner's own words through DSH's native custom-input path. Internal goal categories are not learner-facing questions. The Host then presents a validated cognitive ladder, treats uncertainty as a request for scaffolding, and records learner text, learner choices, and Host recommendations as distinct origins. Every pending native question has an opaque, durable `questionToken`; ordinary Chat can answer a Probe only after the Host explicitly enters `fallback-to-chat`. Profile View remains the final authorization boundary.
+Design, protocol, and acceptance details live in `docs/` and `AGENTS.md`; state-schema epochs and their reset procedure are recorded in `CHANGELOG.md`.

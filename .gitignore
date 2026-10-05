@@ -1,5 +1,6 @@
 node_modules/
 lib/
+.idea/
 test-results/
 playwright-report/
 *.tgz
@@ -11,3 +12,4 @@ __pycache__/
 *.log
 *.pid
 /dsh-source/
+/deepseek-harness/

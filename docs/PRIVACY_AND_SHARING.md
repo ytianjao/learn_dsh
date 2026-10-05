@@ -1,5 +1,5 @@
 # Privacy and sharing
 
-Private lessons may summarize personalized explanations, resolved misconceptions and accepted feedback, but never copy the learner's complete raw answer. Shareable intents pass a deterministic Host scanner for exact internal identifiers, DSH home markers, absolute paths, message/session/source/tool field names and API-key patterns. The model's own redaction is not trusted.
+Lesson articles never copy the learner's complete raw answer. Every submitted intent passes a deterministic Host scanner for exact internal identifier values (workspace, project, session, message and lesson ids), Host control markers, API-key shapes, and absolute local paths. The model's own redaction is not trusted.
 
-Internal lesson files retain provenance for audit. A future publication release must create a separate shareable projection and reject stale documents; it must not expose the internal file directly.
+Reference links are accepted only when the URL literally appears in the captured teaching content, so the model cannot fabricate links. Internal lesson files retain provenance for audit; exports are produced from validated documents only, and preview/download routes resolve strictly within recorded Host-owned locations.

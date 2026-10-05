@@ -1,0 +1,20 @@
+name: Set up pinned DSH source
+description: 'Check out the verified DeepSeek Harness commit into ./deepseek-harness and build it, so the link: dependency family resolves to one source build.'
+runs:
+  using: composite
+  steps:
+    - name: Read DSH baseline
+      id: baseline
+      shell: bash
+      run: node scripts/emit-dsh-baseline-outputs.mjs >> "$GITHUB_OUTPUT"
+    - name: Check out pinned DeepSeek Harness source
+      uses: actions/checkout@v5
+      with:
+        repository: deepseek-ai/deepseek-harness
+        ref: ${{ steps.baseline.outputs.commit }}
+        path: deepseek-harness
+    - name: Install and build DSH
+      shell: bash
+      run: |
+        pnpm --dir deepseek-harness install --frozen-lockfile
+        pnpm --dir deepseek-harness run build
