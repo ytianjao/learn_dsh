@@ -22,15 +22,15 @@ export function createDshSessionReader(sessions:SessionRegistry):LearnLoopSessio
       const session=find(id)
       if(!session)return null
       const wanted=new Set(messageIds),found:AuthoritativeUserMessage[]=[]
-      for(const event of session.events)if(event.type==='user/message'&&event.data.source.kind==='user'&&wanted.has(String(event.data.id)))found.push({seq:event.seq,message:event.data})
+      for(const event of session.snapshotEvents())if(event.type==='user/message'&&event.data.source.kind==='user'&&wanted.has(String(event.data.id)))found.push({seq:event.seq,message:event.data})
       return found
     },
     requestHeader(id,callId,toolName){
       const session=find(id)
       if(!session)return null
-      return findVerifierRequest(session.events,callId,toolName)
+      return findVerifierRequest(session.snapshotEvents(),callId,toolName)
     },
-    assistantTextMessagesInSegments(segments){const result:LessonSourceMessage[]=[],seen=new Set<string>();for(const segment of segments){if(segment.toInclusiveSeq===null)return null;const session=find(segment.sessionId);if(!session||session.seq<segment.toInclusiveSeq)return null;for(const event of session.events){if(event.seq<=segment.fromExclusiveSeq||event.seq>segment.toInclusiveSeq||event.type!=='assistant/message')continue;const messageId=String(event.data.message.id);if(seen.has(messageId))continue;const text=event.data.message.content.filter((block):block is Extract<typeof block,{type:'text'}>=>block.type==='text').map(block=>block.text).join('\n').replace(/\r\n?/g,'\n').trim();if(!text)continue;seen.add(messageId);result.push({sessionId:segment.sessionId,messageId,eventSeq:event.seq,contentHash:sha256(text),text})}}return result},
+    assistantTextMessagesInSegments(segments){const result:LessonSourceMessage[]=[],seen=new Set<string>();for(const segment of segments){if(segment.toInclusiveSeq===null)return null;const session=find(segment.sessionId);if(!session||session.seq<segment.toInclusiveSeq)return null;for(const event of session.snapshotEvents()){if(event.seq<=segment.fromExclusiveSeq||event.seq>segment.toInclusiveSeq||event.type!=='assistant/message')continue;const messageId=String(event.data.message.id);if(seen.has(messageId))continue;const text=event.data.message.content.filter((block):block is Extract<typeof block,{type:'text'}>=>block.type==='text').map(block=>block.text).join('\n').replace(/\r\n?/g,'\n').trim();if(!text)continue;seen.add(messageId);result.push({sessionId:segment.sessionId,messageId,eventSeq:event.seq,contentHash:sha256(text),text})}}return result},
   }
 }
 

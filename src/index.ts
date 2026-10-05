@@ -20,6 +20,7 @@ import { resolveCanonicalWorkspace } from './workspace-identity.js'
 import {createDshSessionReader} from './dsh-session-adapter.js'
 import {createLearnLoopProfileQuestionTool,liveProfileQuestionCalls} from './interview-tool.js'
 import {createUserMessage} from '@deepseek-ai/dsh-llm'
+import {learnloopInstructionsSource} from './message-source.js'
 import {ContentRepository, contentProjectRoot} from './content/repository.js'
 import {lessonSourceSnapshotSchema} from './content/schemas.js'
 import {createLearnLoopWriteLessonDocumentTool} from './content/tool.js'
@@ -36,6 +37,7 @@ export * from './tool-protocol.js'
 export * from './prompt.js'
 export * from './assessment-tool.js'
 export * from './evidence-bridge.js'
+export * from './message-source.js'
 export * from './workspace.js'
 export * from './plan-intent.js'
 export * from './dsh-session-adapter.js'
@@ -63,7 +65,7 @@ export async function apply(ctx: Context): Promise<void> {
   const sessionReader=createDshSessionReader(ctx.sessions)
   const repositoryFor=(workspaceId:string,projectId:string)=>new ContentRepository(contentProjectRoot(workspaceId,projectId))
   const readLessonSnapshot=(workspaceId:string,projectId:string,relativePath:string)=>{try{return lessonSourceSnapshotSchema.parse(JSON.parse(readFileSync(repositoryFor(workspaceId,projectId).path(relativePath),'utf8')))}catch{return null}}
-  const content:ContentServices={sessions:sessionReader,repositoryFor,defaultExportDirectory:()=>dshHomePath('learnloop','exports'),renderPdf:(html,outFile)=>renderPdfFromHtml(html,outFile),wakeAgent:(sessionId,instruction)=>{const agent=ctx.agents.list().find(item=>String(item.id)===sessionId);if(!agent)return false;agent.followup(createUserMessage({source:{kind:'plugin',plugin:'learnloop',form:'instructions'},content:[{type:'text',text:instruction}]}));return true}}
+  const content:ContentServices={sessions:sessionReader,repositoryFor,defaultExportDirectory:()=>dshHomePath('learnloop','exports'),renderPdf:(html,outFile)=>renderPdfFromHtml(html,outFile),wakeAgent:(sessionId,instruction)=>{const agent=ctx.agents.list().find(item=>String(item.id)===sessionId);if(!agent)return false;agent.followup(createUserMessage({source:learnloopInstructionsSource,content:[{type:'text',text:instruction}]}));return true}}
   ctx.effect(() => ctx.systemPrompt.section({ name: 'learnloop-runtime', order: 50, text: context => {
     const sessionId=sessionIdFromAssembleContext(context)
     if(!sessionId)ctx.logger('learnloop').debug({code:'PROMPT_AGENT_CONTEXT_MISSING'},'Runtime prompt omitted: agent context missing')
@@ -84,8 +86,7 @@ export async function apply(ctx: Context): Promise<void> {
   const sync=(state=table.get('singleton')??emptyState(),sessionIds?:readonly string[])=>{syncing=true;try{for(const agent of ctx.agents.list())if(!sessionIds||sessionIds.includes(String(agent.id)))restrictions.sync(agent,state)}finally{syncing=false}}
   const scheduleSync=()=>{if(syncing||scheduled)return;scheduled=true;queueMicrotask(()=>{scheduled=false;sync()})}
   ctx.on('tools/change',scheduleSync)
-  ctx.on('agent/created',({agent})=>restrictions.sync(agent,table.get('singleton')??emptyState()))
-  ctx.on('agent/session-start',({agent})=>{eventWrites=eventWrites.then(()=>table.update('singleton',state=>reconcileProfileInterviewQuestions(state,liveProfileQuestionCalls))).then(state=>restrictions.sync(agent,state),error=>ctx.logger('learnloop').error(error,'Failed to reconcile Profile questions'))})
+  ctx.on('agent/created',({agent})=>{restrictions.sync(agent,table.get('singleton')??emptyState());eventWrites=eventWrites.then(()=>table.update('singleton',state=>reconcileProfileInterviewQuestions(state,liveProfileQuestionCalls))).then(state=>restrictions.sync(agent,state),error=>ctx.logger('learnloop').error(error,'Failed to reconcile Profile questions'));return undefined})
   ctx.on('agent/disposed',({agent})=>{restrictions.dispose(String(agent.id));eventWrites=eventWrites.then(()=>table.update('singleton',state=>reconcileProfileInterviewQuestions(state,liveProfileQuestionCalls,'agent-disposed'))).catch(error=>ctx.logger('learnloop').error(error,'Failed to release disposed-agent Profile question'))})
   ctx.on('tools/result',(exec)=>{if(exec.agent&&exec.name.startsWith('learnloop_'))restrictions.sync(exec.agent,table.get('singleton')??emptyState())})
   sync()

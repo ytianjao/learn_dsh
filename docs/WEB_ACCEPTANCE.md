@@ -69,4 +69,6 @@ Onboarding uses one persisted interview topic at a time. Profile and Plan review
 
 # Keyless Web Acceptance
 
-The deterministic provider must read Runtime V6 Host control, visible Tool names, token, mode, scaffold permission, and learner subject. It returns the exact token and, for the quantitative-trading fixture only, five ordered domain options. The Host appends uncertainty. Playwright must use the real custom field and real option click; no state injection or skip is permitted. Preserve `mock-provider.log`, `dsh-web.log`, `fixture-setup.log`, trace, and screenshots as CI artifacts.
+DSH 0.1.6 gates the browser client behind per-launch browser-session authentication: the orchestrator must read the `?token=` URL printed by `dsh web` and pass it to Playwright as `DSH_WEB_URL`; API routes remain reachable for readiness polling. / DSH 0.1.6 对浏览器客户端启用了每次启动生成令牌认证的认证：编排脚本必须读取 `dsh web` 打印的 `?token=` URL 并作为 `DSH_WEB_URL` 传给 Playwright；就绪轮询使用的 API 路由不受影响。
+
+The deterministic provider must read Runtime V6 Host control, visible Tool names, token, mode, scaffold permission, current Probe, and learner subject. It returns the exact token and, for the quantitative-trading fixture's `goal.outcome` only, five ordered domain options; for every other scaffolded Probe it returns three level-less generic options. The Host appends uncertainty on `goal.outcome`. Playwright must use the real custom field and real option click; no state injection or skip is permitted. Preserve `mock-provider.log`, `dsh-web.log`, `fixture-setup.log`, trace, and screenshots as CI artifacts.

@@ -1,6 +1,6 @@
 # LearnLoop for DeepSeek Harness
 
-LearnLoop is a local-first learning companion for DSH `0.1.1-rc.2` (baseline `b150a551b8d465e31e418e1b2eaf5e79bbb7d28e`). It requires Node `^22.19.0 || >=24` and pnpm `11.7.0`. LearnLoop never reads or manages model credentials.
+LearnLoop is a local-first learning companion for DSH `0.2.1-alpha.1` (baseline `5badb15009ae1756c3afe0ae0cef1faafc290ccc`, linked source checkout). It requires Node `^22.19.0 || >=24` and pnpm `11.7.0`. LearnLoop never reads or manages model credentials.
 
 ## Canonical workspace and content model
 
@@ -40,7 +40,7 @@ The Plan view shows per-task article status, failure reasons, retry, and regener
 
 ## Agent protocol
 
-The **Start learning mode** button is the only activation boundary: the Host creates an `interviewing` Project before submitting “开始建立我的学习档案。 / Start building my learning profile.” No onboarding tool is exposed to the model. DSH 0.1.1-rc.2 registers tools globally, so LearnLoop publishes an exact phase allow-list in each system prompt and independently enforces it at the Tool executor/domain boundary. Plan approval activates the plan but leaves every task pending; the learner must explicitly start the first task in LearnLoop.
+The **Start learning mode** button is the only activation boundary: the Host creates an `interviewing` Project before submitting “开始建立我的学习档案。 / Start building my learning profile.” No onboarding tool is exposed to the model. DSH registers tools globally, so LearnLoop publishes an exact phase allow-list in each system prompt and independently enforces it at the Tool executor/domain boundary. Plan approval activates the plan but leaves every task pending; the learner must explicitly start the first task in LearnLoop.
 
 ## 0.9 learner-first Profile interview
 

@@ -49,6 +49,16 @@ const providerLog=join(artifacts,'mock-provider.log'),webLog=join(artifacts,'dsh
 const env={...process.env,DSH_HOME:dshHome,LEARNLOOP_E2E_WORKSPACE:workspace,LEARNLOOP_INTERVIEW_E2E:'1',DSH_TELEMETRY_DISABLED:'1'}
 console.log(`Keyless E2E state: ${stateRoot}`)
 console.log(`Keyless E2E endpoints: provider=127.0.0.1:${providerPort}, web=127.0.0.1:${webPort}`)
+async function browserUrl(logPath,baseUrl,timeoutMs=30_000){
+ // 0.1.6 dsh web gates the browser client behind a per-launch token printed to stdout;
+ // older baselines print no token and the plain URL is used.
+ const deadline=Date.now()+timeoutMs
+ while(Date.now()<deadline){
+  try{const text=await readFile(logPath,'utf8'),match=text.match(/[?&]token=([A-Za-z0-9_-]+)/);if(match)return `${baseUrl}/?token=${match[1]}`}catch{}
+  await new Promise(resolve=>setTimeout(resolve,250))
+ }
+ return baseUrl
+}
 try{
  await run('bash',['scripts/cloud-acceptance-prepare.sh'],{env})
  const provider=await start('mock provider',process.execPath,['scripts/learner-first-mock-provider.mjs',String(providerPort)],env,providerLog)
@@ -56,6 +66,8 @@ try{
  const dsh=process.env.DSH_BIN?[process.execPath,[process.env.DSH_BIN]]:['pnpm',['exec','dsh']]
  const web=await start('DSH Web',dsh[0],[...dsh[1],'web','--patch',patchPath,'--host','127.0.0.1','--port',String(webPort),'--no-open'],env,webLog)
  await ready('DSH Web',`http://127.0.0.1:${webPort}/learnloop/api/v3/manage`,web,webLog)
- await run(process.execPath,['./node_modules/@playwright/test/cli.js','test'],{env:{...env,DSH_WEB_URL:`http://127.0.0.1:${webPort}`}})
+ const webUrl=await browserUrl(webLog,`http://127.0.0.1:${webPort}`)
+ console.log(`Keyless E2E browser URL: ${webUrl}`)
+ await run(process.execPath,['./node_modules/@playwright/test/cli.js','test'],{env:{...env,DSH_WEB_URL:webUrl}})
 }catch(error){console.error(`Keyless Web E2E failed: ${error instanceof Error?error.stack:error}`);console.error(`Diagnostics: ${providerLog}, ${webLog}, ${join(root,'test-results')}, ${join(root,'playwright-report')}`);process.exitCode=1
 }finally{await cleanup(stateRoot)}

@@ -12,22 +12,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
-      DSH_WEB_URL: http://127.0.0.1:3080
       DSH_TELEMETRY_DISABLED: "1"
-      DSH_BIN: ${{ github.workspace }}/dsh-source/apps/cli/lib/bin.js
+      DSH_BIN: ${{ github.workspace }}/deepseek-harness/apps/cli/lib/bin.js
       LEARNLOOP_INTERVIEW_E2E: "1"
     steps:
       - name: Check out LearnLoop
         uses: actions/checkout@v5
-      - name: Read DSH baseline
-        id: baseline
-        run: node scripts/emit-dsh-baseline-outputs.mjs >> "$GITHUB_OUTPUT"
-      - name: Check out pinned DeepSeek Harness source
-        uses: actions/checkout@v5
-        with:
-          repository: deepseek-ai/deepseek-harness
-          ref: ${{ steps.baseline.outputs.commit }}
-          path: dsh-source
       - uses: pnpm/action-setup@v4
         with:
           version: 11.7.0
@@ -36,21 +26,19 @@ jobs:
         with:
           node-version: 22.19.0
           cache: pnpm
+      - name: Check out and build pinned DSH
+        uses: ./.github/actions/setup-dsh
       - name: Print compatibility baseline
         run: |
           echo "LearnLoop commit: $(git rev-parse HEAD)"
-          echo "DSH version: ${{ steps.baseline.outputs.version }}"
-          echo "DSH commit: ${{ steps.baseline.outputs.commit }}"
+          echo "DSH version: $(node -p 'require('./scripts/dsh-baseline.json').version')"
+          echo "DSH commit: $(node -p 'require('./scripts/dsh-baseline.json').commit')"
           echo "Node version: $(node --version)"
           echo "pnpm version: $(pnpm --version)"
-      - name: Install LearnLoop and DSH dependencies
-        run: |
-          pnpm install --frozen-lockfile
-          pnpm --dir dsh-source install --frozen-lockfile
-      - name: Build pinned DSH and LearnLoop
-        run: |
-          pnpm --dir dsh-source run build
-          pnpm run build
+      - name: Install LearnLoop
+        run: pnpm install --frozen-lockfile
+      - name: Build LearnLoop
+        run: pnpm run build
       - name: Install Playwright Chromium
         run: node ./node_modules/@playwright/test/cli.js install --with-deps chromium
       - name: Block real DeepSeek endpoints

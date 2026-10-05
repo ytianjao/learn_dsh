@@ -14,6 +14,7 @@ jobs:
         with: {version: 11.7.0, run_install: false}
       - uses: actions/setup-node@v5
         with: {node-version: 22.19.0, cache: pnpm}
+      - uses: ./.github/actions/setup-dsh
       - run: pnpm install --frozen-lockfile
       - run: |
           echo "LearnLoop commit: $(git rev-parse HEAD)"
@@ -31,6 +32,7 @@ jobs:
         with: {version: 11.7.0, run_install: false}
       - uses: actions/setup-node@v5
         with: {node-version: 22.19.0, cache: pnpm}
+      - uses: ./.github/actions/setup-dsh
       - run: pnpm install --frozen-lockfile
       - run: pnpm run lint
   unit-domain:
@@ -41,6 +43,7 @@ jobs:
         with: {version: 11.7.0, run_install: false}
       - uses: actions/setup-node@v5
         with: {node-version: 22.19.0, cache: pnpm}
+      - uses: ./.github/actions/setup-dsh
       - run: pnpm install --frozen-lockfile
       - run: pnpm run test:unit
   unit-runtime-http-tool:
@@ -51,6 +54,7 @@ jobs:
         with: {version: 11.7.0, run_install: false}
       - uses: actions/setup-node@v5
         with: {node-version: 22.19.0, cache: pnpm}
+      - uses: ./.github/actions/setup-dsh
       - run: pnpm install --frozen-lockfile
       - run: pnpm run test:integration
       - run: pnpm run test:runtime
@@ -64,6 +68,7 @@ jobs:
         with: {version: 11.7.0, run_install: false}
       - uses: actions/setup-node@v5
         with: {node-version: 22.19.0, cache: pnpm}
+      - uses: ./.github/actions/setup-dsh
       - run: pnpm install --frozen-lockfile
       - run: pnpm run check
       - run: pnpm run package:validate

@@ -1,5 +1,19 @@
 # 变更日志 / Changelog
 
+## Unreleased — DSH 0.2.1-alpha.1 source-tracked baseline
+
+- LearnLoop now follows the latest DeepSeek Harness only: devDependencies link into the sibling source checkout (`./deepseek-harness`, a local junction or the CI checkout), so the plugin and the Host always share one physical module copy; peerDependencies carry the `0.2.1-alpha.1` family string for published consumers. Verified checkout commit `5badb15009ae1756c3afe0ae0cef1faafc290ccc`; Cordis `4.0.2`. / LearnLoop 改为只跟随最新版 DeepSeek Harness：devDependencies 链接到同目录的源码检出（`./deepseek-harness`，本地为 junction、CI 为检出目录），插件与 Host 始终共享同一份物理模块；peerDependencies 为已发布消费者保留 `0.2.1-alpha.1` 家族版本号。已验证检出提交 `5badb15009ae1756c3afe0ae0cef1faafc290ccc`；Cordis `4.0.2`。
+- Followed current Host APIs: the removed `agent/session-start` lifecycle event is merged into `agent/created`, and Session event reads go through `snapshotEvents()` (the deprecated synchronous reader remains the sanctioned path for existing consumers). / 跟进当前 Host API：已移除的 `agent/session-start` 生命周期事件合并进 `agent/created`，Session 事件读取改为 `snapshotEvents()`（该同步读取接口虽已标记废弃，但仍是既有消费者的合规路径）。
+- The keyless Web E2E handles the 0.1.6+ browser-session token and the workspace gate: the orchestrator passes the printed `?token=` URL to Playwright, pins the in-app directory browser, and registers the E2E workspace through the real UI. / keyless Web E2E 适配 0.1.6+ 的浏览器会话令牌与工作区门禁：编排脚本把 `dsh web` 打印的 `?token=` URL 传给 Playwright，固定应用内目录浏览对话框，并通过真实 UI 注册 E2E 工作区。
+- Non-breaking for LearnLoop data: state schema 15, Storage Domain 12, and backup format 9 are unchanged; no reset is required. / 对学习数据非破坏：状态 schema 15、Storage Domain 12、备份格式 9 均不变，无需清理数据。
+
+## Unreleased — learner-first interview options
+
+- Non-breaking: state schema 15, Storage Domain 12, and backup format 9 are unchanged; no reset is required. / 非破坏性：状态 schema 15、Storage Domain 12、备份格式 9 均不变，无需清理数据。
+- After the free-text subject question, every remaining free-text Probe is now scaffolded: the model first analyzes the subject and prior answers (exposed as `interviewAnswers` in the session-scoped prompt data), then proposes 3–6 beginner-friendly, jargon-free options; the Host validates them and falls back to per-Probe generic options when they are absent or invalid. / 自由文本的"想学什么"之后，其余自由文本探针全部改为脚手架选项：模型先分析主题与已回答案（通过会话级 prompt 数据中的 `interviewAnswers` 暴露），再给出 3–6 个无术语的小白友好选项；Host 负责校验，模型未提供或提供无效时使用各探针的 Host 通用兜底选项。
+- Scaffold option `level` is now optional; ordered goal-depth levels remain required only for `goal.outcome`, and a selected scaffolded option stores its label as the normalized value. / 脚手架选项的 `level` 改为可选，仅 `goal.outcome` 仍要求有序目标深度等级；选中脚手架选项时以选项文案作为归一化值。
+- Model-supplied scaffold levels are normalized into a shallow-to-deep ladder by stable sort instead of being rejected for misordered tags, and scaffold argument violations reach the recoverable `INVALID_ARGS` envelope instead of a do-not-retry internal error. / 模型提供的脚手架 level 不再因标记顺序不符而被拒绝，而是由 Host 稳定排序规范成由浅入深的阶梯；脚手架参数违规现在进入可重试的 `INVALID_ARGS` 错误通道，不再卡死在不可重试的内部错误。
+
 ## 0.11.0 — domain model cleanup
 
 - Breaking epoch: package 0.11.0, state schema 15, Storage Domain 12, backup format 9. Clear only LearnLoop domain data or use an isolated `DSH_HOME`.

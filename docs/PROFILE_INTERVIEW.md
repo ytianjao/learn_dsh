@@ -8,7 +8,7 @@ LearnLoop persists ordered learner-first Probes from `goal.subject` through `suc
 # Profile Interview V6
 
 1. The Host asks `goal.subject` as free text: the learner needs no taxonomy or professional terminology.
-2. `goal.outcome` is scaffolded. The model may propose 3–6 ordered levels; the Host validates them, assigns opaque values, stores the actual snapshot, and appends “还不确定，请根据入门目标推荐”. Invalid or absent suggestions fall back to the generic Host ladder.
+2. Every later Probe is option-based. For scaffolded Probes the model first reasons over the subject and prior answers (exposed as `interviewAnswers` in the session prompt data), then proposes 3–6 beginner-friendly, jargon-free options covering distinct situations; the Host validates them, assigns opaque values, stores the actual snapshot, and falls back to a per-Probe generic Host scaffold when suggestions are absent or invalid. Only `goal.outcome` keeps ordered goal-depth levels and the appended “还不确定，请根据入门目标推荐” option; a selected scaffolded option stores its label as the normalized value.
 3. Native `custom` overrides `selected` and is learner evidence. A selected option is learner choice; selecting uncertainty produces a separately labelled Host recommendation (`overview`).
 4. “不知道” is Probe-specific: subject needs help, outcome/success criteria need scaffolding, gaps are valid evidence, and deadline becomes no deadline.
 5. A durable opaque `questionToken` binds the current Session, Project, Probe revision, and native question. Replay retains it; progression/release invalidates it; stale calls never open UI.

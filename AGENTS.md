@@ -37,16 +37,19 @@ intentional compatibility upgrade (see §10).
 | --- | --- |
 | Node | `^22.19.0 \|\| >=24` |
 | pnpm | `11.7.0` (activate via `corepack`) |
-| DSH baseline | `0.1.1-rc.2` @ commit `b150a551b8d465e31e418e1b2eaf5e79bbb7d28e` |
-| Cordis | `4.0.1` |
+| DSH baseline | `0.2.1-alpha.1` @ commit `5badb15009ae1756c3afe0ae0cef1faafc290ccc` (linked source checkout) |
+| Cordis | `4.0.2` |
 | TypeScript | `^5.9` |
 | Zod | `^4` (runtime validation backbone) |
 | Build | `tsdown`; Tests `vitest@3`; Lint `eslint@9` + `typescript-eslint`; E2E `@playwright/test` |
 
-- The single machine-readable DSH baseline is `scripts/dsh-baseline.json`. All
-  `@deepseek-ai/dsh*` peer/dev dependencies must equal that version; this is enforced by
-  `pnpm run verify:dsh-baseline` (`scripts/verify-dsh-baseline.mjs`), which also checks the
-  lockfile and the Web E2E workflow.
+- The single machine-readable DSH baseline is `scripts/dsh-baseline.json`. LearnLoop follows
+  the latest Harness only: `@deepseek-ai/dsh*` **peer** dependencies carry the baseline version
+  string, while **dev** dependencies `link:` into the sibling source checkout
+  (`./deepseek-harness`, a junction locally, a CI checkout in workflows), so the plugin and the
+  Host share one physical module copy. `pnpm run verify:dsh-baseline`
+  (`scripts/verify-dsh-baseline.mjs`) enforces the peer strings, the link targets' versions,
+  checkout drift against the recorded commit, and the lockfile/workflow shape.
 - Host code consumes only **public DSH seams**: Cordis `Context`, Storage Domain, Host Web
   Server, tools, system prompt, agents, sessions, workspace registry, and user questions.
 
@@ -159,7 +162,7 @@ Conventions:
 
 ## 7. Agent / model protocol
 
-Exactly four tools are registered globally (DSH rc.2 registers tools globally), so LearnLoop
+Exactly four tools are registered globally (DSH registers tools globally), so LearnLoop
 publishes an exact **phase allow-list** in each System Prompt and independently enforces it
 at the tool-executor/domain boundary (`tool-protocol.ts` + `tool-restriction.ts`):
 
@@ -298,10 +301,13 @@ clean, keyless environment instead of your real `DSH_HOME`.
 
 - Changing the **persisted shape** → bump state schema + Storage Domain version + backup
   format together and log a new breaking epoch in `CHANGELOG.md`. No migrations.
-- Changing the **DSH baseline** → update `scripts/dsh-baseline.json` and every
-  `@deepseek-ai/dsh*` pin, then rerun build, typecheck, lint, the full test suite, and the
+- Changing the **DSH baseline** → pull `./deepseek-harness` forward, rebuild it
+  (`pnpm --dir deepseek-harness install && pnpm --dir deepseek-harness run build`), update
+  `scripts/dsh-baseline.json` (version + commit) and the `@deepseek-ai/dsh*` **peer** version
+  strings, then rerun `pnpm install`, build, typecheck, lint, the full test suite, and the
   real Web acceptance. Keep `docs/UPSTREAM_COMPATIBILITY.md` and `docs/DSH_BASELINE.md`
-  current.
+  current. `pnpm run verify:dsh-baseline` fails when the checkout drifts from the recorded
+  commit.
 - Adding a **tool** → register it in `src/index.ts`, add its name and phase contract in
   `src/tool-protocol.ts`, and cover it with schema + recovery tests.
 - Editing **UI copy or docs** → preserve the 中文/English bilingual pairing.
