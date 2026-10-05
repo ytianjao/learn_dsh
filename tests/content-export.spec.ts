@@ -2,7 +2,7 @@ import {describe,expect,it} from 'vitest'
 import {mkdtemp,readFile,stat,writeFile} from 'node:fs/promises'
 import {tmpdir} from 'node:os'
 import {join} from 'node:path'
-import {unzipSync,strFromU8} from 'fflate'
+import {strFromU8,strToU8,unzipSync,unzlibSync} from 'fflate'
 import {activeProject,workspaceOf} from '../src/index.js'
 import {buildLessonEpub} from '../src/content/publish/epub.js'
 import {exportLessonPackage,resolveExportParent} from '../src/content/publish/exporter.js'
@@ -84,6 +84,16 @@ describe('export package',()=>{
  })
 })
 
+function pdfToUnicodeText(bytes:Uint8Array){
+ const raw=strFromU8(bytes,true),text:string[]=[]
+ for(const match of raw.matchAll(/stream\r?\n([\s\S]*?)endstream/g)){
+  let body=match[1]
+  try{body=strFromU8(unzlibSync(strToU8(body,true)),true)}catch{}
+  if(body.includes('beginbf'))text.push(body)
+ }
+ return text.join('\n')
+}
+
 describe('PDF via local browser',()=>{
  const browser=findBrowserExecutable()
  const itPdf=browser?it:it.skip
@@ -92,7 +102,8 @@ describe('PDF via local browser',()=>{
   await renderPdfFromHtml('<!DOCTYPE html><html lang="zh-CN"><body><h1>执行边界入门</h1><p>中文渲染检查</p></body></html>',out)
   const bytes=await readFile(out)
   expect(bytes.subarray(0,5).toString()).toBe('%PDF-')
-  expect(bytes.length).toBeGreaterThan(10_000)
+  const text=pdfToUnicodeText(bytes)
+  for(const code of ['6267','884C','8FB9','754C','5165','95E8'])expect(text).toContain(code) // UTF-16BE hex of 执行边界入门 in the embedded ToUnicode CMap
  },60_000)
 })
 
