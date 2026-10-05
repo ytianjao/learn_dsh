@@ -1,5 +1,5 @@
 name: Set up pinned DSH source
-description: Check out the verified DeepSeek Harness commit into ./deepseek-harness and build it, so the link: dependency family resolves to one source build.
+description: 'Check out the verified DeepSeek Harness commit into ./deepseek-harness and build it, so the link: dependency family resolves to one source build.'
 runs:
   using: composite
   steps:

@@ -31,8 +31,7 @@ jobs:
       - name: Print compatibility baseline
         run: |
           echo "LearnLoop commit: $(git rev-parse HEAD)"
-          echo "DSH version: $(node -p 'require('./scripts/dsh-baseline.json').version')"
-          echo "DSH commit: $(node -p 'require('./scripts/dsh-baseline.json').commit')"
+          node -e "const b=require('./scripts/dsh-baseline.json'); console.log('DSH version:',b.version); console.log('DSH commit:',b.commit)"
           echo "Node version: $(node --version)"
           echo "pnpm version: $(pnpm --version)"
       - name: Install LearnLoop
