@@ -36,6 +36,13 @@ pnpm run verify:dsh-baseline  # peer strings, link targets, checkout drift, lock
 pnpm run e2e:keyless:web      # full browser flow against a deterministic mock provider
 ```
 
+## After editing / 修改后更新
+
+- `src/**`: `pnpm run build`, then restart `dsh web` — the profile links the plugin in place, so there is nothing to reinstall or re-register. / 改源码后重新构建并重启服务即可，链接都是活路径，无需重装或重新注册。
+- `client/bundle.js`: reload the browser page. / 改客户端 bundle 后刷新页面。
+- Dependency changes: `pnpm install`. / 依赖变更后重新 install。
+- `./deepseek-harness` moved forward: rebuild it, then `pnpm run verify:dsh-baseline` (bump `scripts/dsh-baseline.json` on drift, see `AGENTS.md` §13). / Harness 检出前进后重新构建并校验基线。
+
 ## Use
 
 - **Interview:** the first question (“你现在想学什么？”) is free text; every later question is option-based — the model analyzes the subject and prior answers, then proposes beginner-friendly options, while custom text always remains valid. Confirm the generated Profile in the LearnLoop Profile view.
