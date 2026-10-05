@@ -289,9 +289,11 @@ pnpm run acceptance:reset        # clean up the isolated acceptance profile
 ## 12. Install & run (for manual verification)
 
 ```bash
-pnpm install --frozen-lockfile && pnpm run build
-dsh plugin --profile web add .   # register the plugin into the DSH web profile
-dsh web                          # start DSH Web, then use "Start learning mode" in the UI
+# Prerequisite: the Harness source checkout must exist at ./deepseek-harness (junction or
+# clone) and be built — see README "Install from zero".
+pnpm install && pnpm run build
+pnpm exec dsh plugin --profile web add .   # register the plugin into the DSH web profile
+pnpm exec dsh web                          # start DSH Web, open the printed ?token= URL
 ```
 
 Use the isolated acceptance flow (`pnpm run acceptance:prepare` / `acceptance:web`) for a
