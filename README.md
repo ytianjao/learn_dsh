@@ -50,3 +50,27 @@ pnpm run e2e:keyless:web      # full browser flow against a deterministic mock p
 - **Articles:** after a task passes, generate a lesson article from the Plan view and export Markdown, a static HTML site, PDF, EPUB, or a combined ZIP.
 
 Design, protocol, and acceptance details live in `docs/` and `AGENTS.md`; state-schema epochs and their reset procedure are recorded in `CHANGELOG.md`.
+
+## Breaking upgrades / 破坏性升级
+
+Every persisted-shape change raises the state schema, the Storage Domain version, and the backup
+format together and forms a **clean break**. There is **no migration, no compatibility alias, and no
+legacy import** — an older stored state is rejected rather than converted. LearnLoop never resets or
+deletes DSH data on its own; the state simply stops validating until you clear it.
+
+每次持久化形状变更都会同时提升状态 schema、Storage Domain 版本与备份格式，并构成一次**彻底断层**。**不提供迁移、兼容别名或旧数据导入**——旧状态会被拒绝而不是转换。LearnLoop 不会自行重置或删除 DSH 数据；在您清理之前，状态只会持续校验失败。
+
+Current epoch: **state schema 16, Storage Domain 13, backup format 10**（见 `CHANGELOG.md`）。
+
+To reset, pick one / 重置方式二选一：
+
+- **Clear only LearnLoop data / 只清空 LearnLoop 数据** — remove the `learnloop` Storage Domain
+  state inside your `DSH_HOME`, leaving every other DSH feature untouched.
+  / 删除 `DSH_HOME` 下的 `learnloop` Storage Domain 状态，其它 DSH 功能不受影响。
+- **Use an isolated home / 使用隔离的 DSH_HOME** — point `DSH_HOME` at a fresh directory (this is
+  what `pnpm run acceptance:prepare` does). Recommended when you only want to try a new epoch.
+  / 将 `DSH_HOME` 指向全新目录（`pnpm run acceptance:prepare` 即如此）。仅想试用新 epoch 时推荐。
+
+Exports and backups contain learning data; take one before a breaking upgrade if you want a copy,
+but note a pre-epoch backup is not importable after the break.
+导出与备份包含学习数据；如需留存副本请在破坏性升级前导出，但请注意断层前的备份无法再导入。

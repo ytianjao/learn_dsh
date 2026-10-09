@@ -77,10 +77,10 @@ Invariants: `project.sessionId === mutation.sessionId`; active and blocked curre
 - **Assessment:** every acceptance criterion has exactly one criterion result.
 - **Completion:** `task.status === completed` implies a verified assessment result of `passed` or `excellent`.
 - **Visibility:** the answer appears as an ordinary Chat user message; verifier policy appears only in System Prompt/trajectory.
-- **Mastery:** one passed answer produces at most `demonstrated`; `mastered` requires future cross-time review.
+- **Mastery:** one passed answer produces `practicing` and never `mastered`; a concept reaches `mastered` only by accumulating three verified evidence items including a formal assessment, which for a shared concept means more than one Task.
 - **Backup:** only the owner Session can export a complete project backup.
 
-Verified Answer Loop v1 accepts text only. It does not automatically verify images or artifacts, implement mastered retention, or rewrite arbitrary model prose. Model judgment can still be wrong; the host nevertheless enforces provenance, complete criterion coverage, and state boundaries.
+Verified Answer Loop v1 accepts text only. It does not automatically verify images or artifacts, or rewrite arbitrary model prose. Mastery is evidence-count based rather than time-decayed: `nextReviewAt` is recorded but no spaced-review scheduler consumes it yet. Model judgment can still be wrong; the host nevertheless enforces provenance, complete criterion coverage, and state boundaries.
 
 
 ## Canonical persistence boundary (0.2.0)

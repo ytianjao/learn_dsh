@@ -13,6 +13,7 @@ import type { StateTable } from './types.js'
 import { createLearnLoopCreatePlanDraftTool } from './tool.js'
 import {LearnLoopToolRestrictions} from './tool-restriction.js'
 import { createLearnLoopAssessmentTool } from './assessment-tool.js'
+import { createLearnLoopPlanAdjustmentTool } from './plan-adjustment-tool.js'
 import { renderLearnLoopSystemSection, sessionIdFromAssembleContext } from './prompt.js'
 import { capturePreStepAnswer, enrichCandidateEvent } from './evidence-bridge.js'
 import {consumeProfileFallbackMessage,reconcileProfileInterviewQuestions} from './workspace.js'
@@ -36,6 +37,7 @@ export * from './tool.js'
 export * from './tool-protocol.js'
 export * from './prompt.js'
 export * from './assessment-tool.js'
+export * from './plan-adjustment-tool.js'
 export * from './evidence-bridge.js'
 export * from './message-source.js'
 export * from './workspace.js'
@@ -74,6 +76,7 @@ export async function apply(ctx: Context): Promise<void> {
   ctx.effect(() => ctx.tools.register(createLearnLoopCreatePlanDraftTool(table, workspaceResolver)), 'learnloop.createPlanDraftTool()')
   ctx.effect(() => ctx.tools.register(createLearnLoopProfileQuestionTool(table,ctx.userQuestions,sessionReader)), 'learnloop.profileQuestionTool()')
   ctx.effect(() => ctx.tools.register(createLearnLoopAssessmentTool(table, sessionReader)), 'learnloop.assessmentTool()')
+  ctx.effect(() => ctx.tools.register(createLearnLoopPlanAdjustmentTool(table)), 'learnloop.planAdjustmentTool()')
   ctx.effect(() => ctx.tools.register(createLearnLoopWriteLessonDocumentTool(table, sessionReader, repositoryFor)), 'learnloop.writeLessonDocumentTool()')
   let eventWrites:Promise<unknown> = Promise.resolve()
   ctx.on('agent/pre-step', async (payload, next) => {await eventWrites;return capturePreStepAnswer(table, String(payload.agent.id), payload.signal, next)})

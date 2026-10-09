@@ -24,8 +24,10 @@ export const INTERVIEW_PROBES:readonly InterviewProbeDefinition[]=[
  scaffolded('target-outcome.quality-bar','target-outcome',()=> '哪一种可理解的结果会让你觉得已经达到这个目标？',[{label:'能用自己的话向别人讲清楚'},{label:'能独立完成一个基础的小任务'},{label:'能做出一个完整的小作品'},{label:'能解决工作、学习或考试里的实际问题'},{label:'还不确定，先定一个容易达到的小目标'}],'scaffold'),
  fixed('current-foundation.level','current-foundation','你目前的基础处于哪个阶段？',[{label:'初学者',value:'beginner'},{label:'有一定基础',value:'intermediate'},{label:'经验丰富',value:'advanced'}]),
  scaffolded('current-foundation.relevant-experience','current-foundation',()=> '你有哪些与这个主题相关的经验？',[{label:'完全没接触过'},{label:'听过或看过相关介绍'},{label:'学过一点，但没有用完或没坚持下来'},{label:'做过相关的小练习或小项目'}]),
+ scaffolded('current-foundation.existing-resources','current-foundation',()=> '你已经有哪些跟这个主题相关的材料或资源？没有也可以说明。',[{label:'还没有任何资料'},{label:'有一本教材或一门课程'},{label:'有一些零散的网页、视频或笔记'},{label:'有可以请教的老师、同事或朋友'}]),
  scaffolded('knowledge-gaps.primary-gaps','knowledge-gaps',()=> '你目前知道哪些不清楚的地方？不知道也可以直接说明。',[{label:'不知道应该从哪里开始'},{label:'听过一些名词，但不理解意思'},{label:'会照着做，但说不清背后的原理'},{label:'说不清自己缺什么'}]),
  fixed('time-budget.weekly-hours','time-budget','你每周大约能投入多少小时？',[1,2,4,6,10].map(value=>({label:`${value} 小时`,value:String(value)}))),
+ scaffolded('time-budget.distribution','time-budget',()=> '这些时间大体是怎么安排的？',[{label:'每天一小段，比较规律'},{label:'集中在周末的整块时间'},{label:'不固定，看哪天有空'},{label:'只能利用碎片时间'}]),
  scaffolded('time-budget.deadline','time-budget',()=> '你希望在什么时间前达到目标？没有明确期限也可以说明。',[{label:'没有明确期限'},{label:'1 个月以内'},{label:'3 个月以内'},{label:'半年到一年'}]),
  fixed('learning-mode.mode','learning-mode','你更希望课程偏重知识理解、实践训练，还是两者平衡？',[{label:'知识优先',value:'knowledge-first'},{label:'平衡',value:'balanced'},{label:'实践优先',value:'practice-first'}]),
  scaffolded('learning-mode.example-preference','learning-mode',()=> '你希望案例和示例以什么形式出现？',[{label:'多用生活里的类比'},{label:'一步一步跟着做的示例'},{label:'可以直接照着做的完整例子'},{label:'先讲明白原理，再看例子'}]),
@@ -61,6 +63,18 @@ export const allowedChatReplies=(def:InterviewProbeDefinition)=>(def.fixedOption
 export const questionForProbe=(id:InterviewProbeId,interview:ProfileInterviewState)=>probeDefinition(id).question(interview)
 
 const unsafe=/<[^>]+>|tool\s*call|workspace|session|probe\s*id/i
+/**
+ * Validate a model-authored question for the current Probe. The model may phrase the question in
+ * the learner's language and refer to the subject, but it may not smuggle control markers, tool
+ * names, or internal identifiers into the learner-facing text. Returns null when unusable so the
+ * caller falls back to the Host-owned wording.
+ */
+export function validateProbeQuestion(question:string|undefined):string|null{
+ if(question===undefined)return null
+ const text=question.trim()
+ if(text.length<4||text.length>600||unsafe.test(text))return null
+ return text
+}
 const ranks:Record<GoalIntent,number>={explore:0,overview:1,interpret:2,'guided-use':3,'independent-use':4,design:5}
 export function validateScaffoldOptions(input:readonly ScaffoldOptionInput[]){
  if(input.length<3||input.length>6)throw Error('Scaffold options must contain 3–6 items.')

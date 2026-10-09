@@ -60,12 +60,23 @@ src/                  TypeScript Host source (compiled to lib/)
   index.ts            Cordis plugin entry: name/inject/apply; wires storage, tools, routes, events
   types.ts            ALL Zod schemas + inferred domain types (single source of truth)
   domain.ts           LearnLoopDomainError, Storage Domain spec, emptyState/ensureState
-  workspace.ts        Aggregate commands (onboarding, profile, plan, task lifecycle, assessment)
+  workspace.ts        Barrel re-exporting the aggregate commands (keeps the public surface stable)
+  commands/           Aggregate commands split by namespace:
+    shared.ts         Cross-cutting helpers + the Workspace/Session command core
+    bus.ts            Atomic command bus: idempotency receipts, revision CAS, event log
+    interview.ts      Profile interview state machine, token lifecycle, recovery paths
+    profile.ts        Profile commit / confirm / preference revision / re-open
+    plan.ts           Plan versions, approval, adjustment proposals and activation
+    task.ts           Task transitions, plan-order selection, check arming
+    evidence.ts       Evidence candidates, assessment settlement, candidate discard
+    mastery.ts        Concept-level mastery ladder and per-concept rows
+    fixture.ts        Deterministic domain fixtures for tests and scripts
   workspace-identity.ts  Canonical Workspace/Session resolution
   http.ts             HTTP v3 handler: routes, mutation schema, domain-error → status map
   tool.ts             learnloop_create_plan_draft tool
   assessment-tool.ts  learnloop_assess_answer tool
   interview-tool.ts   learnloop_ask_profile_question tool
+  plan-adjustment-tool.ts  learnloop_propose_plan_adjustment tool
   interview-probes.ts / profile-compiler.ts / plan-intent.ts   Interview + profile/plan compile
   tool-protocol.ts    Tool names, phase allow-list, error encoding (LEARNLOOP_TOOL_ERROR_V2)
   tool-restriction.ts LearnLoopToolRestrictions: per-agent tool deny-list enforcement
@@ -162,15 +173,19 @@ Conventions:
 
 ## 7. Agent / model protocol
 
-Exactly four tools are registered globally (DSH registers tools globally), so LearnLoop
+Five tools are registered globally (DSH registers tools globally), so LearnLoop
 publishes an exact **phase allow-list** in each System Prompt and independently enforces it
 at the tool-executor/domain boundary (`tool-protocol.ts` + `tool-restriction.ts`):
 
-- `learnloop_ask_profile_question` — ask the current Host-owned profile question (opaque token).
+- `learnloop_ask_profile_question` — ask the current Host-owned profile question (opaque token);
+  the model phrases the wording, the Host validates it and falls back to its own.
 - `learnloop_create_plan_draft` — submit a minimal Plan Intent; the Host compiles IDs,
   dependencies, revisions, and status.
 - `learnloop_assess_answer` — validate every acceptance criterion for the armed answer.
 - `learnloop_write_lesson_document` — submit a structured `LessonDocumentIntent` (once per task).
+- `learnloop_propose_plan_adjustment` — submit a revised Plan Intent while the plan is **active**;
+  the Host compiles it into a new immutable draft version that the learner must approve. Never
+  replaces the running plan silently.
 
 Key flows:
 
