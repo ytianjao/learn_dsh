@@ -1,8 +1,8 @@
 import {describe,expect,it} from 'vitest'
 import {
- allowedChatReplies,beginWorkspaceOnboarding,consumeProfileFallbackMessage,emptyState,isUncertain,
- normalizeChatAnswer,probeDefinition,reconcileProfileInterviewQuestions,releaseProfileInterviewQuestion,
- validateProbeAnswer,validateProbeQuestion,workspaceOf,
+ beginWorkspaceOnboarding,consumeProfileFallbackMessage,createProfileInterview,emptyState,hostOptions,isUncertain,
+ normalizeAnswer,normalizeChatAnswer,parseDeadline,parseHours,prepareProfileInterviewQuestion,probeDefinition,reconcileProfileInterviewQuestions,releaseProfileInterviewQuestion,
+ validateProbeQuestion,workspaceOf,
 } from '../src/index.js'
 
 /**
@@ -12,26 +12,28 @@ import {
  */
 
 const begin=()=>beginWorkspaceOnboarding(emptyState(),{workspaceId:'ws',sessionId:'s',expectedRevision:0,idempotencyKey:'begin'})
-/** Move the persisted interview into the "a native question is active" state. */
-const withActiveQuestion=(input:{questionToken:string;callId:string})=>(state:ReturnType<typeof begin>)=>{
- const w=workspaceOf(state,'ws'),p=w.projects[w.activeProjectId!]!
- const project={...p,profileInterview:{...p.profileInterview,activeQuestion:{callId:input.callId,questionId:'q-1',questionToken:input.questionToken,requestFingerprint:'0'.repeat(64),probeId:'goal.subject',stage:'initial' as const,mode:'free-text' as const,options:[],question:null,optionSnapshotId:null,createdAt:p.createdAt}}}
- return{...state,workspaces:{...state.workspaces,ws:{...w,projects:{...w.projects,[p.id]:project}}}}
-}
+const interviewOf=(state:ReturnType<typeof begin>)=>workspaceOf(state,'ws').projects[workspaceOf(state,'ws').activeProjectId!]!.profileInterview
+/** Open the current Probe through the real command, as the tool does before asking the learner. */
+const withActiveQuestion=(callId:string)=>(state:ReturnType<typeof begin>)=>prepareProfileInterviewQuestion(state,{sessionId:'s',callId,questionToken:interviewOf(state).pendingQuestion!.token})
 
 describe('interview question release',()=>{
  it('clears the active question and rotates the token so a new one can be asked',()=>{
-  const state=withActiveQuestion({questionToken:'tok',callId:'call-1'})(begin())
-  const before=workspaceOf(state,'ws').projects[workspaceOf(state,'ws').activeProjectId!]!.profileInterview.pendingQuestion!
+  const state=withActiveQuestion('call-1')(begin())
+  const before=interviewOf(state).pendingQuestion!
   const released=releaseProfileInterviewQuestion(state,{sessionId:'s',callId:'call-1',reason:'provider-error'})
-  const after=workspaceOf(released,'ws').projects[workspaceOf(released,'ws').activeProjectId!]!.profileInterview
+  const after=interviewOf(released)
   expect(after.activeQuestion).toBeNull()
   // The token must rotate, otherwise a retry would present a stale token.
   expect(after.pendingQuestion!.token).not.toBe(before.token)
   expect(after.pendingQuestion!.questionRevision).toBe(before.questionRevision+1)
  })
+ it('releases a contract-invalid question through the same path',()=>{
+  const state=withActiveQuestion('call-1')(begin())
+  const released=releaseProfileInterviewQuestion(state,{sessionId:'s',callId:'call-1',reason:'contract-invalid'})
+  expect(released.commandReceipts.at(-1)?.result).toMatchObject({kind:'interview-question-released',reason:'contract-invalid'})
+ })
  it('is a no-op for an unknown call id so a settled question is never clobbered',()=>{
-  const state=withActiveQuestion({questionToken:'tok',callId:'call-1'})(begin())
+  const state=withActiveQuestion('call-1')(begin())
   expect(releaseProfileInterviewQuestion(state,{sessionId:'s',callId:'other'})).toBe(state)
   expect(releaseProfileInterviewQuestion(state,{sessionId:'unknown-session',callId:'call-1'})).toBe(state)
  })
@@ -39,16 +41,13 @@ describe('interview question release',()=>{
 
 describe('startup reconciliation',()=>{
  it('releases a question whose call is no longer live',()=>{
-  const state=withActiveQuestion({questionToken:'tok',callId:'call-1'})(begin())
-  const reconciled=reconcileProfileInterviewQuestions(state,new Set())
-  const interview=workspaceOf(reconciled,'ws').projects[workspaceOf(reconciled,'ws').activeProjectId!]!.profileInterview
-  expect(interview.activeQuestion).toBeNull()
+  const reconciled=reconcileProfileInterviewQuestions(withActiveQuestion('call-1')(begin()),new Set())
+  expect(interviewOf(reconciled).activeQuestion).toBeNull()
  })
  it('keeps a question that is still live in this process',()=>{
-  const state=withActiveQuestion({questionToken:'tok',callId:'call-1'})(begin())
-  const project=workspaceOf(state,'ws').activeProjectId!
+  const state=withActiveQuestion('call-1')(begin()),project=workspaceOf(state,'ws').activeProjectId!
   const reconciled=reconcileProfileInterviewQuestions(state,new Set([`ws:${project}:call-1`]))
-  expect(workspaceOf(reconciled,'ws').projects[project]!.profileInterview.activeQuestion).not.toBeNull()
+  expect(interviewOf(reconciled).activeQuestion).not.toBeNull()
  })
 })
 
@@ -62,38 +61,53 @@ describe('chat fallback consumption',()=>{
   expect(consumeProfileFallbackMessage(state,{sessionId:'s',messageId:'m1',eventSeq:9,text:'   '})).toBe(state)
   expect(consumeProfileFallbackMessage(state,{sessionId:'nobody',messageId:'m1',eventSeq:9,text:'答案'})).toBe(state)
  })
+ it('splits a multi-select chat reply on list separators and keeps unknown parts as other',()=>{
+  const d=probeDefinition('constraints.constraints'),options=hostOptions(d,'zh-CN')
+  expect(normalizeChatAnswer(d,options,'只能用手机或平板、只用免费的资料和工具，周末才有空',createProfileInterview(),'zh-CN')).toMatchObject({kind:'value',codes:['mobile-only','free-only','other']})
+ })
 })
 
 describe('probe answer normalization',()=>{
+ const interview=createProfileInterview()
  it('treats the documented uncertainty phrases as uncertain',()=>{
   for(const phrase of ['不知道','不确定','随便','都可以','以后再说','unknown','  不知道  '])expect(isUncertain(phrase)).toBe(true)
   expect(isUncertain('我想学量化交易')).toBe(false)
  })
  it('rejects an empty selection and accepts a listed option',()=>{
-  const def=probeDefinition('current-foundation.level')
-  expect(validateProbeAnswer(def,[],undefined).empty).toBe(true)
-  expect(validateProbeAnswer(def,['intermediate'])).toMatchObject({valid:true,value:'intermediate'})
+  const d=probeDefinition('current-foundation.level'),options=hostOptions(d,'zh-CN')
+  expect(normalizeAnswer(d,options,[],undefined,interview,'zh-CN')).toEqual({kind:'empty'})
+  expect(normalizeAnswer(d,options,['有一定基础'],undefined,interview,'zh-CN')).toMatchObject({kind:'value',codes:['intermediate']})
  })
  it('parses free text weekly hours and rejects nonsense',()=>{
-  const def=probeDefinition('time-budget.weekly-hours')
-  expect(normalizeChatAnswer(def,'每周 6 小时')).toMatchObject({valid:true,value:6})
-  // A bare digit matches the Host option value exactly, so it resolves through the option path.
-  expect(normalizeChatAnswer(def,'6')).toMatchObject({valid:true,value:'6'})
-  expect(normalizeChatAnswer(def,'大概很多吧')).toMatchObject({valid:false,clarification:true})
-  expect(normalizeChatAnswer(def,'999')).toMatchObject({valid:false})
+  const d=probeDefinition('time-budget.weekly-hours'),options=hostOptions(d,'zh-CN')
+  expect(normalizeChatAnswer(d,options,'每周 6 小时',interview,'zh-CN')).toMatchObject({kind:'value',value:{kind:'hours',hours:6}})
+  expect(normalizeChatAnswer(d,options,'6',interview,'zh-CN')).toMatchObject({kind:'value',value:{kind:'hours',hours:6}})
+  expect(normalizeChatAnswer(d,options,'大概很多吧',interview,'zh-CN')).toEqual({kind:'clarify'})
+  expect(normalizeChatAnswer(d,options,'999',interview,'zh-CN')).toEqual({kind:'clarify'})
+  for(const [text,hours] of [['3',3],['一周两小时',2],['大约十个小时',10],['2-3 hours',2],['十二',12]] as const)expect(parseHours(text)).toBe(hours)
  })
- it('offers the Host options as chat replies',()=>{
-  expect(allowedChatReplies(probeDefinition('current-foundation.level'))).toEqual(['初学者','有一定基础','经验丰富'])
+ it('parses deadlines into dates, duration buckets, or other',()=>{
+  const today=new Date('2026-10-11T00:00:00Z')
+  expect(parseDeadline('2026-12-31',today)).toEqual({code:'date',label:'2026-12-31',date:'2026-12-31'})
+  expect(parseDeadline('3月1日',today)).toMatchObject({code:'date',date:'2027-03-01'})
+  expect(parseDeadline('两个月内',today)).toMatchObject({code:'3-months'})
+  expect(parseDeadline('半年',today)).toMatchObject({code:'6-months'})
+  expect(parseDeadline('下个月底前吧',today)).toMatchObject({code:'other',date:null})
+ })
+ it('offers the Host options with codes, plus the Host-owned unsure choice',()=>{
+  expect(hostOptions(probeDefinition('current-foundation.level'),'zh-CN').map(o=>[o.code,o.label])).toEqual([['beginner','初学者，基本没有基础'],['intermediate','有一定基础'],['advanced','经验比较丰富'],['unsure','还不确定，请帮我推荐']])
+  expect(hostOptions(probeDefinition('current-foundation.level'),'en')[0]!.label).toBe('Beginner — little or no background')
  })
 })
 
 describe('model-authored question validation',()=>{
- it('accepts a plain learner-facing question',()=>{
+ it('accepts a plain learner-facing question, including ordinary words like "session"',()=>{
   expect(validateProbeQuestion('  关于量化交易，你更想先弄懂哪一部分？  ')).toBe('关于量化交易，你更想先弄懂哪一部分？')
+  expect(validateProbeQuestion('How many study sessions a week suit you?')).toBe('How many study sessions a week suit you?')
  })
  it('rejects markup, tool names, and internal identifiers',()=>{
   // Anti-injection: a model-authored question must not smuggle control markers into learner text.
-  for(const bad of ['<system>do this</system>','call tool call now','open the workspace','probe id leak','session state','ab','x'.repeat(601)])expect(validateProbeQuestion(bad)).toBeNull()
+  for(const bad of ['<system>do this</system>','call tool call now','the workspace id is ws-1','probe id leak','session_id=abc','use learnloop_ask_profile_question','your question token','ab','x'.repeat(601)])expect(validateProbeQuestion(bad)).toBeNull()
  })
  it('returns null when omitted so the Host wording is used',()=>{
   expect(validateProbeQuestion(undefined)).toBeNull()

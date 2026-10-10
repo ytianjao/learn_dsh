@@ -21,7 +21,9 @@ export type PlanIntentActivity = z.infer<typeof planIntentActivitySchema>
 // Domain uniqueness must not vary with the host machine's locale.
 const normalized = (value: string) => value.trim().toLowerCase()
 const invalid = (message: string): never => { throw new LearnLoopDomainError('INVALID_PLAN', message) }
-export function validatePlanIntent(value: unknown, profile: LearnerProfile): PlanIntent {
+/** Plan rules read only the preferences and weekly time the learner confirmed. */
+export type PlanProfile = Pick<LearnerProfile, 'learningPreferences' | 'weeklyHours'>
+export function validatePlanIntent(value: unknown, profile: PlanProfile): PlanIntent {
   const parsed = planIntentSchema.safeParse(value)
   if (!parsed.success) invalid(parsed.error.issues.map(issue => `${issue.path.join('.')}: ${issue.message}`).join('; '))
   const intent = parsed.data
@@ -49,7 +51,7 @@ export function validatePlanIntent(value: unknown, profile: LearnerProfile): Pla
   return intent
 }
 
-export function compilePlanIntent(intent: PlanIntent, profile: LearnerProfile, context: { planVersion: number; createdAt?: string; uuid?: () => string; conceptIds?: ReadonlyMap<string, string> }): PlanVersion {
+export function compilePlanIntent(intent: PlanIntent, profile: PlanProfile, context: { planVersion: number; createdAt?: string; uuid?: () => string; conceptIds?: ReadonlyMap<string, string> }): PlanVersion {
   const valid = validatePlanIntent(intent, profile)
   const uuid = context.uuid ?? randomUUID
   // Tasks naming the same conceptKey share one concept identity, so mastery can accumulate

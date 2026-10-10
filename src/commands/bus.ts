@@ -1,5 +1,5 @@
 /** Atomic command bus: idempotency receipts, monotonic revision CAS, event log. */
-import {DEFAULT_PREFERENCES, LearnLoopDomainError, payloadHash} from '../domain.js'
+import {LearnLoopDomainError, payloadHash} from '../domain.js'
 import {interviewTopics, learnLoopStateSchema, type Assessment, type CriterionAssessment, type LearnerProfile, type LearningProject, type InterviewTopic, type InterviewProbeId, type LearningTask, type LearnLoopState, type CommandResult, type VerifiedTaskAssessment, type WorkspaceLearningState} from '../types.js'
 import {fail,now,uid,workspaceOf} from './shared.js'
 type Context={workspaceId:string;projectId:string|null;sessionId?:string;expectedRevision:number;idempotencyKey:string;allowInactiveProject?:boolean}

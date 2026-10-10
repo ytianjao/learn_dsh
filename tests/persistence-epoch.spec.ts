@@ -1,5 +1,5 @@
 import {describe,expect,it} from 'vitest'
-import {BACKUP_FORMAT_VERSION,emptyState,learnLoopDomainSpec,learnLoopStateSchema,validatePlanIntent,type LearnerProfile} from '../src/index.js'
+import {BACKUP_FORMAT_VERSION,emptyState,learnLoopDomainSpec,learnLoopStateSchema,validatePlanIntent,type PlanProfile} from '../src/index.js'
 
 /**
  * Guards the three version numbers that must move together when the persisted shape changes
@@ -12,24 +12,23 @@ describe('persistence epoch versions',()=>{
   const domainVersion = learnLoopDomainSpec.version
   const backupVersion = BACKUP_FORMAT_VERSION
   // Each epoch raises all three by exactly one from the 15/12/9 baseline, so the offsets are fixed.
-  expect(schemaVersion).toBe(16)
-  expect(domainVersion).toBe(13)
-  expect(backupVersion).toBe(10)
+  expect(schemaVersion).toBe(18)
+  expect(domainVersion).toBe(15)
+  expect(backupVersion).toBe(12)
   expect(schemaVersion - 15).toBe(domainVersion - 12)
   expect(schemaVersion - 15).toBe(backupVersion - 9)
  })
  it('builds an empty state that already satisfies the current schema',()=>{
   const state = emptyState()
-  expect(state.schemaVersion).toBe(16)
+  expect(state.schemaVersion).toBe(18)
   expect(learnLoopStateSchema.parse(state)).toEqual(state)
  })
 })
 
-const profile=(overrides:Partial<LearnerProfile['learningPreferences']>={},weeklyHours=4):LearnerProfile=>({
-  id:'profile',revision:1,goal:'学运行时边界，并理解核心概念',goalSubject:'运行时边界',goalIntent:'overview',desiredOutcome:'理解核心概念',goalKind:null,targetOutcome:'能解释',
-  priorKnowledge:'有一些经验',experienceLevel:'intermediate',knowledgeGaps:['不知道从哪开始'],
-  learningPreferences:{mode:'balanced',practiceCapacity:'light',explanationDepth:'standard',exampleDensity:'standard',additionalNotes:'',...overrides},
-  weeklyHours,deadline:undefined,constraints:[],successCriteria:['能解释'],unansweredQuestions:[],fieldOrigins:{},confirmedAt:null,createdAt:'2026-01-01T00:00:00.000Z',updatedAt:'2026-01-01T00:00:00.000Z',
+/** Plan rules read only the confirmed preferences and weekly time. */
+const profile=(overrides:Partial<PlanProfile['learningPreferences']>={},weeklyHours=4):PlanProfile=>({
+  learningPreferences:{mode:'balanced',practiceCapacity:'light',explanationDepth:'standard',exampleDensity:'standard',examplePreferences:[{code:'walkthrough',label:'走一遍真实小例子',source:'host'}],additionalNotes:'',...overrides},
+  weeklyHours,
 })
 
 const task=(title:string,activity:'explain'|'example'|'apply',estimateMinutes=20)=>({title,objective:`${title} 的目标`,activity,acceptanceCriteria:['说清要点'],checkPrompt:'说清要点',estimateMinutes})

@@ -75,6 +75,9 @@ Only what file names do not tell you:
   `BACKUP_FORMAT_VERSION`.
 - `src/tool-protocol.ts` — tool names, phase contracts, and the error-code → recovery mapping
   the model sees.
+- `src/interview-probes.ts`, `src/interview-answer.ts` — the Host-defined interview spec (kind,
+  cardinality, option codes) and the pure pipeline that reads answers into codes and validates
+  model enhancements. A model that sends only the token must still complete the interview.
 - `src/evidence-bridge.ts`, `src/dsh-session-adapter.ts` — capture the learner's answer from
   DSH events and check its provenance, fail-closed.
 - `src/content/` — the lesson pipeline; `publish/` holds the exporters.
@@ -119,6 +122,11 @@ Focused suites and acceptance scripts are in `package.json` `scripts`; CI jobs a
   `docs/DSH_BASELINE.md` and `docs/UPSTREAM_COMPATIBILITY.md` current.
 - **New tool** → register it in `src/index.ts`, add its name and phase contract to
   `src/tool-protocol.ts`, and cover its schema and recovery paths with tests.
+- **Interview Probe or option code** → change `INTERVIEW_PROBES` (including its `presence`), the
+  projection in `src/profile-compiler.ts`, and the rows and edit specs in `src/profile-view.ts`
+  together; keep the null-model baseline short; keep
+  `tests/interview-pipeline.spec.ts` passing (the noisy model must reproduce the null-model
+  Profile) and update `docs/PROFILE_INTERVIEW.md`. A persisted-shape change is a new epoch.
 - **New error code** → add it to `LearnLoopErrorCode`, map its HTTP status in `statusByCode`
   (default `409`), and classify its recovery in `src/tool-protocol.ts`. Unclassified codes fall
   back to `do-not-retry`, which strands the model on errors it could repair.

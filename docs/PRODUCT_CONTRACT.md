@@ -98,7 +98,7 @@ are rejected rather than migrated or silently reset.
 
 ## Current LearnLoop interaction protocol
 
-Activation is Host-owned: button → HTTP `begin-learning-mode` → `interviewing` Project → visible learner intent. The agent interviews, commits and obtains explicit Profile confirmation, creates a Draft Plan, and asks the learner to **确认并启用计划 / Confirm and activate plan**. After confirmation the Plan is active, execution is null, and all Tasks remain pending. Teaching starts only after the learner explicitly starts the first Task in LearnLoop. LearnLoop phase policy and domain guards reject wrong-phase model calls with `INVALID_PROJECT_PHASE`; model-visible outputs use semantic fields such as `profileRevision`, `planId`, and `planVersion`, never a generic workspace revision.
+Activation is Host-owned: button → HTTP `begin-learning-mode` → `interviewing` Project → visible learner intent. The agent drives the Host-defined interview, the Host compiles the Profile and obtains explicit Profile confirmation, the agent creates a Draft Plan, and asks the learner to **确认并启用计划 / Confirm and activate plan**. After confirmation the Plan is active, execution is null, and all Tasks remain pending. Teaching starts only after the learner explicitly starts the first Task in LearnLoop. LearnLoop phase policy and domain guards reject wrong-phase model calls with `INVALID_PROJECT_PHASE`; model-visible outputs use semantic fields such as `profileRevision`, `planId`, and `planVersion`, never a generic workspace revision.
 
 ### Upstream rc.8 limitations
 
@@ -108,11 +108,11 @@ DSH rc.8 exposes Agent-scoped `agent.ctx.tools.restrict({ deny })` and `guard()`
 
 Task execution has one primary entry in the conversation composer. The plan view is read-only for task execution: it presents stages, task state, Evidence, and Mastery without start/check/pause/resume/skip controls. `derivePrimaryLearningAction` maps Project, Session, and execution state to the only current action.
 
-The phase policy permits profile commit while interviewing; profile commit/confirmation/preference revision in profile review; plan draft creation and explicit preference revision while planning; plan revision, explicit preference revision, and approval in plan review; and assessment only while awaiting an answer or verifying. Native questions are limited to interviewing, profile review, and plan review. Teaching and needs-revision prohibit shadow quizzes.
+The phase policy permits the Host interview tool while interviewing; profile confirmation or a revision request in profile review; plan draft creation and explicit preference revision while planning; plan revision, explicit preference revision, and approval in plan review; and assessment only while awaiting an answer or verifying. Native questions are limited to interviewing, profile review, and plan review. Teaching and needs-revision prohibit shadow quizzes.
 
-Preference revision is learner-initiated, increments the Profile revision, clears confirmation, archives a draft, and returns to profile review. Plan validation otherwise repairs Plan Intent within confirmed constraints. A general request for relevant industry examples remains `standard`; `high` requires explicit dense or every-stage wording.
+Preference revision is learner-initiated, increments the Profile revision, clears confirmation, archives a draft, and returns to profile review. Plan validation otherwise repairs Plan Intent within confirmed constraints. Example density is `high` only when the learner picks the Host option `example-rich`; no learner or model wording is interpreted.
 
-Command receipts store canonical Profile commit/confirmation/preference-revision and Plan approval results before later phase validation, so exact retries replay after phase advancement. Activation uses a per-click `activationAttemptId`; one network retry reuses it, while a new activation after clear creates a new attempt.
+Command receipts store canonical Profile confirmation/preference-revision and Plan approval results before later phase validation, so exact retries replay after phase advancement. Activation uses a per-click `activationAttemptId`; one network retry reuses it, while a new activation after clear creates a new attempt.
 
 ## Runtime V4 review boundary
 
@@ -123,4 +123,4 @@ Onboarding uses one persisted interview topic at a time. Profile and Plan review
 
 # Product Contract
 
-LearnLoop is learner-first: it stores the learner's raw subject before creating planning structure. Internal classifications never become the first question. DSH native custom input is a supported protocol path. Probes express Host information needs rather than a rigid form. Recommendations and learner evidence have distinct origins and remain reviewable. Runtime V6 tokenizes stateful Tool calls and reserves ordinary Chat for explicit Host fallback. The content runtime generates Host-validated lesson articles through `learnloop_write_lesson_document` and exports them as Markdown, a static HTML site, PDF, EPUB, and a combined ZIP.
+LearnLoop is learner-first: it stores the learner's raw subject before creating planning structure. Internal classifications never become the first question. DSH native custom input is a supported protocol path. Probes express Host information needs rather than a rigid form. Recommendations and learner evidence have distinct origins and remain reviewable. Every Probe's kind, cardinality, and option codes are Host-defined (`docs/PROFILE_INTERVIEW.md`); the model only rewords, relabels codes, records labelled assumptions, or adds bounded follow-ups, and ordinary Chat is reserved for explicit Host fallback. The content runtime generates Host-validated lesson articles through `learnloop_write_lesson_document` and exports them as Markdown, a static HTML site, PDF, EPUB, and a combined ZIP.

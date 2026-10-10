@@ -1,5 +1,5 @@
 import {describe,expect,it} from 'vitest'
-import {activeProject,approvePlanAdjustment,approveWorkspacePlan,beginWorkspaceOnboarding,commitWorkspaceProfile,completeProfileInterviewFixture,confirmWorkspaceProfile,createPlanDraftFromIntent,emptyState,nextAction,proposePlanAdjustment,workspaceOf} from '../src/index.js'
+import {activeProject,approvePlanAdjustment,approveWorkspacePlan,beginWorkspaceOnboarding,completeProfileInterviewFixture,confirmWorkspaceProfile,createPlanDraftFromIntent,emptyState,nextAction,proposePlanAdjustment,workspaceOf} from '../src/index.js'
 
 /**
  * Covers the "adjust the plan while teaching" capability: the model proposes, the Host compiles a
@@ -16,9 +16,8 @@ function active(){
  let state=beginWorkspaceOnboarding(emptyState(),{workspaceId:'ws',sessionId:'s',expectedRevision:0,idempotencyKey:'begin'})
  const projectId=workspaceOf(state,'ws').activeProjectId!
  const rev=()=>workspaceOf(state,'ws').revision
- state=completeProfileInterviewFixture(state,'ws')
- state=commitWorkspaceProfile(state,{workspaceId:'ws',projectId,sessionId:'s',expectedRevision:rev(),idempotencyKey:'profile',goal:'Learn',targetOutcome:'Target',priorKnowledge:'Some',experienceLevel:'intermediate',knowledgeGaps:[],learningMode:'balanced',practiceCapacity:'light',weeklyHours:4,constraints:[],successCriteria:['Know']})
- state=confirmWorkspaceProfile(state,{workspaceId:'ws',projectId,sessionId:'s',profileRevision:1,expectedRevision:rev(),idempotencyKey:'confirm'})
+ state=completeProfileInterviewFixture(state,'ws',{'goal.subject':'Learn'})
+ state=confirmWorkspaceProfile(state,{workspaceId:'ws',projectId,sessionId:'s',profileRevision:activeProject(workspaceOf(state,'ws')).profileRevision,expectedRevision:rev(),idempotencyKey:'confirm'})
  state=createPlanDraftFromIntent(state,{sessionId:'s',callId:'plan',plan:basePlan(original)})
  state=approveWorkspacePlan(state,{workspaceId:'ws',projectId,sessionId:'s',expectedRevision:rev(),idempotencyKey:'approve',planId:activeProject(workspaceOf(state,'ws')).plans[0]!.id})
  return{state,projectId,rev,ids:{workspaceId:'ws',projectId,sessionId:'s'}}

@@ -1,7 +1,7 @@
 import {mkdtemp} from 'node:fs/promises'
 import {tmpdir} from 'node:os'
 import {join} from 'node:path'
-import {activeProject,approveWorkspacePlan,assessCurrentCandidate,beginTaskCheck,beginWorkspaceOnboarding,commitWorkspaceProfile,completeProfileInterviewFixture,confirmWorkspaceProfile,createEvidenceCandidate,createPlanDraftFromIntent,emptyState,startTask,workspaceOf,type LearnLoopState} from '../src/index.js'
+import {activeProject,approveWorkspacePlan,assessCurrentCandidate,beginTaskCheck,beginWorkspaceOnboarding,completeProfileInterviewFixture,confirmWorkspaceProfile,createEvidenceCandidate,createPlanDraftFromIntent,emptyState,startTask,workspaceOf,type LearnLoopState} from '../src/index.js'
 import {sha256} from '../src/content/hash.js'
 import type {LessonSourceMessage,LessonSourceSegment} from '../src/content/schemas.js'
 
@@ -24,9 +24,8 @@ export function passTask(state:LearnLoopState,ids:{workspaceId:string;projectId:
 export function readyContentState(){
  let state=beginWorkspaceOnboarding(emptyState(),{workspaceId:'ws',sessionId:'s',expectedRevision:0,idempotencyKey:'begin'})
  const projectId=workspaceOf(state,'ws').activeProjectId!
- state=completeProfileInterviewFixture(state,'ws')
- state=commitWorkspaceProfile(state,{workspaceId:'ws',projectId,sessionId:'s',expectedRevision:workspaceOf(state,'ws').revision,idempotencyKey:'profile',goal:'学习运行时边界',targetOutcome:'能解释并应用',priorKnowledge:'有一定基础',experienceLevel:'intermediate',knowledgeGaps:[],learningMode:'balanced',practiceCapacity:'light',weeklyHours:4,constraints:[],successCriteria:['能解释']})
- state=confirmWorkspaceProfile(state,{workspaceId:'ws',projectId,sessionId:'s',profileRevision:1,expectedRevision:workspaceOf(state,'ws').revision,idempotencyKey:'confirm'})
+ state=completeProfileInterviewFixture(state,'ws',{'goal.subject':'学习运行时边界'})
+ state=confirmWorkspaceProfile(state,{workspaceId:'ws',projectId,sessionId:'s',profileRevision:activeProject(workspaceOf(state,'ws')).profileRevision,expectedRevision:workspaceOf(state,'ws').revision,idempotencyKey:'confirm'})
  state=createPlanDraftFromIntent(state,{sessionId:'s',callId:'plan',plan:contentPlan})
  state=approveWorkspacePlan(state,{workspaceId:'ws',projectId,planId:activeProject(workspaceOf(state,'ws')).plans[0]!.id,expectedRevision:workspaceOf(state,'ws').revision,idempotencyKey:'approve',sessionId:'s'})
  const ids={workspaceId:'ws',projectId,sessionId:'s'}

@@ -58,7 +58,7 @@ The state stores business data only at `workspaces[workspaceId].projects[project
 
 ## Current LearnLoop interaction protocol
 
-Activation is Host-owned: button → HTTP `begin-learning-mode` → `interviewing` Project → visible learner intent. The agent interviews, commits and obtains explicit Profile confirmation, creates a Draft Plan, and asks the learner to **确认并启用计划 / Confirm and activate plan**. After confirmation the Plan is active, execution is null, and all Tasks remain pending. Teaching starts only after the learner explicitly starts the first Task in LearnLoop. LearnLoop phase policy and domain guards reject wrong-phase model calls with `INVALID_PROJECT_PHASE`; model-visible outputs use semantic fields such as `profileRevision`, `planId`, and `planVersion`, never a generic workspace revision.
+Activation is Host-owned: button → HTTP `begin-learning-mode` → `interviewing` Project → visible learner intent. The agent drives the Host-defined interview, the Host compiles the Profile and obtains explicit Profile confirmation, the agent creates a Draft Plan, and asks the learner to **确认并启用计划 / Confirm and activate plan**. After confirmation the Plan is active, execution is null, and all Tasks remain pending. Teaching starts only after the learner explicitly starts the first Task in LearnLoop. LearnLoop phase policy and domain guards reject wrong-phase model calls with `INVALID_PROJECT_PHASE`; model-visible outputs use semantic fields such as `profileRevision`, `planId`, and `planVersion`, never a generic workspace revision.
 
 ## Runtime V4 review boundary
 
@@ -69,4 +69,4 @@ Onboarding uses one persisted interview topic at a time. Profile and Plan review
 
 # Acceptance Scenarios
 
-The required browser path creates a Workspace and Session, starts learning mode, observes `LEARNLOOP_RUNTIME_V6`, submits `简单了解量化交易系统` through native custom input, and receives domain-specific scaffold options plus the Host-added uncertainty option. Selecting uncertainty records a conservative Host recommendation; selecting the overview option records learner choice. Adjacent Tool arguments contain different question tokens, no identical-call warning occurs, no DeepSeek request is made, and Profile confirmation remains in LearnLoop UI.
+The required browser path creates a Workspace and Session, starts learning mode, observes `LEARNLOOP_RUNTIME_V8`, submits `简单了解量化交易系统` through native custom input, and answers every Host-defined Probe — multi-select ones through real checkboxes — until Profile review. With the enhancing mock the outcome options carry subject-specific labels for Host codes and one field is assumed and flagged; with `MOCK_MODEL_POLICY=null` only Host wording appears. The review dialog shows every field with its origin. Adjacent Tool arguments contain different question tokens, no identical-call warning occurs, no DeepSeek request is made, and Profile confirmation remains in LearnLoop UI.

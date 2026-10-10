@@ -12,7 +12,7 @@ import {tmpdir} from 'node:os'
 import {join} from 'node:path'
 import {unzipSync,strFromU8} from 'fflate'
 import {
- emptyState,learnLoopStateSchema,beginWorkspaceOnboarding,completeProfileInterviewFixture,commitWorkspaceProfile,confirmWorkspaceProfile,createPlanDraftFromIntent,approveWorkspacePlan,
+ emptyState,learnLoopStateSchema,beginWorkspaceOnboarding,completeProfileInterviewFixture,confirmWorkspaceProfile,createPlanDraftFromIntent,approveWorkspacePlan,
  startTask,beginTaskCheck,createEvidenceCandidate,assessCurrentCandidate,workspaceOf,activeProject,
  requestArticleGeneration,runLessonCapture,createLearnLoopWriteLessonDocumentTool,exportLessonPackage,renderPdfFromHtml,findBrowserExecutable,ContentRepository,
 } from '../lib/index.js'
@@ -45,16 +45,15 @@ async function passTask(table,ids,taskId,seq,failFirst){
  else await assess('passed',[],'only',seq.assess)
 }
 
-async function makeProject(language,plan,profile,teaching,revision){
+async function makeProject(language,plan,answers,teaching,revision){
  const settings={...emptyState().settings,language}
  const state0=learnLoopStateSchema.parse({...emptyState(),settings})
  const table=tableOf(state0),workspaceId=`ws-${language}`,sessionId=`session-${language}`
  await table.update('singleton',state=>beginWorkspaceOnboarding(state,{workspaceId,sessionId,expectedRevision:0,idempotencyKey:'begin'}))
  const projectId=workspaceOf(table.get('singleton'),workspaceId).activeProjectId
  const ids={workspaceId,projectId,sessionId}
- await table.update('singleton',state=>completeProfileInterviewFixture(state,workspaceId))
- await table.update('singleton',state=>commitWorkspaceProfile(state,{...ids,expectedRevision:rev(state,workspaceId),idempotencyKey:'profile',...profile}))
- await table.update('singleton',state=>confirmWorkspaceProfile(state,{...ids,profileRevision:1,expectedRevision:rev(state,workspaceId),idempotencyKey:'confirm'}))
+ await table.update('singleton',state=>completeProfileInterviewFixture(state,workspaceId,answers))
+ await table.update('singleton',state=>confirmWorkspaceProfile(state,{...ids,profileRevision:activeProject(workspaceOf(state,workspaceId)).profileRevision,expectedRevision:rev(state,workspaceId),idempotencyKey:'confirm'}))
  await table.update('singleton',state=>createPlanDraftFromIntent(state,{sessionId,callId:'plan',plan}))
  await table.update('singleton',state=>approveWorkspacePlan(state,{...ids,planId:activeProject(workspaceOf(state,workspaceId)).plans[0].id,expectedRevision:rev(state,workspaceId),idempotencyKey:'approve'}))
  return{table,ids,sessions:fakeSessions(teaching,revision)}
@@ -85,7 +84,7 @@ const zhPlan={stages:[{title:'第一阶段：边界',outcome:'理解 Host 权威
  {title:'验证闭环',objective:'描述候选、评测、证据的因果链',activity:'example',acceptanceCriteria:['指出证据来源要求','说明幂等键的作用'],checkPrompt:'描述一次正式验证的完整链路',estimateMinutes:30}]}]}
 const zhTeaching='本课讲解 Host 权威边界：学习计划、任务状态与证据都只能由 Host 命令迁移；模型输出只是建议。延伸阅读见 https://example.com/host-authority 这份公开说明。'
 const zhRevision='补充：常见误区是把模型的解释当成状态事实；只有带幂等键的验证结果才会写入。'
-const zh=await makeProject('zh-CN',zhPlan,{goal:'运行时边界',targetOutcome:'能解释并应用边界',priorKnowledge:'了解基础概念',experienceLevel:'intermediate',knowledgeGaps:[],learningMode:'balanced',practiceCapacity:'light',weeklyHours:4,constraints:[],successCriteria:['能解释']},zhTeaching,zhRevision)
+const zh=await makeProject('zh-CN',zhPlan,{'goal.subject':'运行时边界'},zhTeaching,zhRevision)
 const zhTasks=activeProject(workspaceOf(zh.table.get('singleton'),zh.ids.workspaceId)).plans[0].stages[0].tasks
 await passTask(zh.table,zh.ids,zhTasks[0].id,{start:10,arm:20,answer:25,assess:30})
 await passTask(zh.table,zh.ids,zhTasks[1].id,{start:40,arm:50,answer:55,assess:60},['把模型解释当成状态事实'])
@@ -119,7 +118,7 @@ check('文章不含伪造链接',!zhJson.includes('fabricated'))
 
 // ---- English project: one verified task, one article ------------------------------------------
 const enPlan={stages:[{title:'Stage 1: Boundaries',outcome:'Understand host authority',tasks:[{title:'Execution boundary',objective:'Explain the boundary',activity:'explain',acceptanceCriteria:['Name the state owner','Explain idempotent retry'],checkPrompt:'Explain the boundary in your own words',estimateMinutes:30},{title:'Recovery',objective:'Describe recovery',activity:'apply',acceptanceCriteria:['Describe restart recovery'],checkPrompt:'Describe what happens after a restart',estimateMinutes:30}]}]}
-const en=await makeProject('en',enPlan,{goal:'Runtime boundaries',targetOutcome:'Explain and apply',priorKnowledge:'Some',experienceLevel:'intermediate',knowledgeGaps:[],learningMode:'balanced',practiceCapacity:'light',weeklyHours:3,constraints:[],successCriteria:['Explain']},'This lesson explains host authority: state transitions happen only through Host commands. See https://example.com/host-authority for the public reference.','Revision note: model prose never moves state.')
+const en=await makeProject('en',enPlan,{'goal.subject':'Runtime boundaries','time-budget.weekly-hours':3},'This lesson explains host authority: state transitions happen only through Host commands. See https://example.com/host-authority for the public reference.','Revision note: model prose never moves state.')
 const enTasks=activeProject(workspaceOf(en.table.get('singleton'),en.ids.workspaceId)).plans[0].stages[0].tasks
 await passTask(en.table,en.ids,enTasks[0].id,{start:10,arm:20,answer:25,assess:30})
 const enIntents=[[enTasks[0].id,{title:'The Execution Boundary',summary:'Why only Host commands may move learning state, and how that makes retry safe.',learningObjectives:['Explain the execution boundary','Distinguish model advice from Host facts'],prerequisites:[],sections:[

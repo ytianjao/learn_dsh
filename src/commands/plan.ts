@@ -1,5 +1,5 @@
 /** Plan versions: draft creation from Intent, Host review, approval, revision requests. */
-import {DEFAULT_PREFERENCES, LearnLoopDomainError, payloadHash} from '../domain.js'
+import {LearnLoopDomainError, payloadHash} from '../domain.js'
 import { compilePlanIntent, validatePlanIntent, type PlanIntent } from '../plan-intent.js'
 import {interviewTopics, learnLoopStateSchema, type Assessment, type CriterionAssessment, type LearnerProfile, type LearningProject, type InterviewTopic, type InterviewProbeId, type LearningTask, type LearnLoopState, type CommandResult, type VerifiedTaskAssessment, type WorkspaceLearningState} from '../types.js'
 import {activeProject,fail,now,requireToolPhase,workspaceForSession,workspaceOf} from './shared.js'

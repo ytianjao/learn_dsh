@@ -27,10 +27,14 @@ pnpm add -g ../deepseek-harness/apps/cli
 pnpm install --frozen-lockfile && pnpm run build
 pnpm run verify:dsh-baseline
 
-# 4. Install the plugin and start, with the official commands / 用官方命令安装插件并启动
+# 4. Install the plugin from this repo, then start DSH from a separate study folder
+#    在本仓库安装插件，再到单独的学习目录启动 DSH
 dsh plugin --profile web add .
+mkdir -p ../learnloop-study && cd ../learnloop-study
 dsh web        # open the printed http://127.0.0.1:3080/?token=... URL / 打开打印的带 token 的地址
 ```
+
+Start `dsh web` outside this repo: DSH uses the launch directory as the session workspace, so a session started here would read this repo's `AGENTS.md` and could edit the plugin source. / 不要在本仓库里启动 `dsh web`：DSH 以启动目录作为会话工作区，在这里启动会让学习会话读到本仓库的 `AGENTS.md`，并能改写插件源码。
 
 Then click **开启学习模式 / Start learning mode** in the UI. If step 2 reports that the global bin directory is not in PATH, run `pnpm setup` once and open a new terminal. / 若第 2 步提示全局 bin 目录不在 PATH 中，先执行一次 `pnpm setup` 并重开终端。
 
@@ -47,6 +51,7 @@ pnpm run check                # typecheck + client syntax + all tests
 pnpm run lint
 pnpm run verify:dsh-baseline  # peer strings, link targets, checkout drift, lockfile, workflow
 pnpm run e2e:keyless:web      # full browser flow against a deterministic mock provider
+MOCK_MODEL_POLICY=null pnpm run e2e:keyless:web   # the same flow with a "null model" that sends only the question token
 ```
 
 ## After editing / 修改后更新
@@ -58,7 +63,7 @@ pnpm run e2e:keyless:web      # full browser flow against a deterministic mock p
 
 ## Use
 
-- **Interview:** the first question (“你现在想学什么？”) is free text; every later question is option-based — the model analyzes the subject and prior answers, then proposes beginner-friendly options, while custom text always remains valid. Confirm the generated Profile in the LearnLoop Profile view.
+- **Interview:** a short baseline — what you want to learn, how far, what you have tried, how you want to learn, and your weekly time (plus practice limits if you want hands-on practice). Every question is defined by LearnLoop, single- or multi-select as it should be, and custom text always remains valid. The model may add a relevant optional question (such as a deadline when you mention an exam), reword questions for your subject, or assume an answer you already made clear — all of it is flagged in the LearnLoop Profile view, where you can edit any field, fill in ones that were not asked, and confirm. / 访谈只有一个很短的基线：想学什么、学到什么程度、接触过什么、想怎么学、每周时间（选择动手练习时再问练习限制）。每道题都由 LearnLoop 定义，该多选的就是多选，也始终可以自己输入。模型可以按需追加相关的可选题（例如你提到考试时追问期限）、按你的主题改写题目，或推断你已说清的答案——这些都会在学习档案审阅页中标注；你可以在审阅页修改任一字段、补充未询问的内容，再确认档案。
 - **Plan and tasks:** review and approve the draft plan, then start each task explicitly. A formal check captures the next learner answer and validates every acceptance criterion; passing writes assessment, evidence, and mastery atomically.
 - **Articles:** after a task passes, generate a lesson article from the Plan view and export Markdown, a static HTML site, PDF, EPUB, or a combined ZIP.
 
@@ -73,7 +78,7 @@ deletes DSH data on its own; the state simply stops validating until you clear i
 
 每次持久化形状变更都会同时提升状态 schema、Storage Domain 版本与备份格式，并构成一次**彻底断层**。**不提供迁移、兼容别名或旧数据导入**——旧状态会被拒绝而不是转换。LearnLoop 不会自行重置或删除 DSH 数据；在您清理之前，状态只会持续校验失败。
 
-Current epoch: **state schema 16, Storage Domain 13, backup format 10**（见 `CHANGELOG.md`）。
+Current epoch: **state schema 18, Storage Domain 15, backup format 12**（见 `CHANGELOG.md`）。
 
 To reset, pick one / 重置方式二选一：
 

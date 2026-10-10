@@ -1,5 +1,5 @@
 import {describe,expect,it} from 'vitest'
-import {activeProject,approveWorkspacePlan,assessCurrentCandidate,beginTaskCheck,beginWorkspaceOnboarding,commitWorkspaceProfile,completeProfileInterviewFixture,confirmWorkspaceProfile,createEvidenceCandidate,createPlanDraftFromIntent,emptyState,startTask,workspaceOf} from '../src/index.js'
+import {activeProject,approveWorkspacePlan,assessCurrentCandidate,beginTaskCheck,beginWorkspaceOnboarding,completeProfileInterviewFixture,confirmWorkspaceProfile,createEvidenceCandidate,createPlanDraftFromIntent,emptyState,startTask,workspaceOf} from '../src/index.js'
 import {sha256} from '../src/content/hash.js'
 
 /**
@@ -17,9 +17,8 @@ function armed(){
  let state=beginWorkspaceOnboarding(emptyState(),{workspaceId:'ws',sessionId:'s',expectedRevision:0,idempotencyKey:'begin'})
  ids.projectId=workspaceOf(state,'ws').activeProjectId!
  const rev=()=>workspaceOf(state,'ws').revision
- state=completeProfileInterviewFixture(state,'ws')
- state=commitWorkspaceProfile(state,{...ids,expectedRevision:rev(),idempotencyKey:'profile',goal:'Learn',targetOutcome:'Target',priorKnowledge:'Some',experienceLevel:'intermediate',knowledgeGaps:[],learningMode:'balanced',practiceCapacity:'light',weeklyHours:4,constraints:[],successCriteria:['Know']})
- state=confirmWorkspaceProfile(state,{...ids,profileRevision:1,expectedRevision:rev(),idempotencyKey:'confirm'})
+ state=completeProfileInterviewFixture(state,'ws',{'goal.subject':'Learn'})
+ state=confirmWorkspaceProfile(state,{...ids,profileRevision:activeProject(workspaceOf(state,'ws')).profileRevision,expectedRevision:rev(),idempotencyKey:'confirm'})
  state=createPlanDraftFromIntent(state,{sessionId:'s',callId:'plan',plan})
  state=approveWorkspacePlan(state,{...ids,planId:activeProject(workspaceOf(state,'ws')).plans[0]!.id,expectedRevision:rev(),idempotencyKey:'approve'})
  const taskId=activeProject(workspaceOf(state,'ws')).plans[0]!.stages[0]!.tasks[0]!.id

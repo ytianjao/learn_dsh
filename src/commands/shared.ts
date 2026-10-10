@@ -1,6 +1,6 @@
 /** Cross-cutting helpers and the Workspace/Session command core. */
 import {randomUUID} from 'node:crypto'
-import {DEFAULT_PREFERENCES, LearnLoopDomainError, payloadHash} from '../domain.js'
+import {LearnLoopDomainError, payloadHash} from '../domain.js'
 import {executablePhasesForTool,toolAllowed,type LearnLoopToolName} from '../tool-protocol.js'
 import {emptyProjectContentIndex} from '../content/schemas.js'
 import {interviewTopics, learnLoopStateSchema, type Assessment, type CriterionAssessment, type LearnerProfile, type LearningProject, type InterviewTopic, type InterviewProbeId, type LearningTask, type LearnLoopState, type CommandResult, type VerifiedTaskAssessment, type WorkspaceLearningState} from '../types.js'
