@@ -39,7 +39,7 @@ Verified-answer integration is constrained to pinned DSH 0.2.1-alpha.1 public ag
 
 ## Canonical persistence boundary (0.2.0)
 
-Schema 15 stores business data only at `workspaces[workspaceId].projects[projectId]`. Projects independently own profile, plans, execution, candidates, verified evidence and assessments, mastery, and misconceptions. `activeSessionId` is an execution attachment, not ownership. API v3 reads by Workspace; storage domain 12 rejects earlier LearnLoop states. No code automatically resets or deletes DSH data.
+The state stores business data only at `workspaces[workspaceId].projects[projectId]`. Projects independently own profile, plans, execution, candidates, verified evidence and assessments, mastery, and misconceptions. `activeSessionId` is an execution attachment, not ownership. API v3 reads by Workspace; the current Storage Domain version rejects states from earlier epochs (see `CHANGELOG.md`). No code automatically resets or deletes DSH data.
 
 ## rc.8 Tool schema audit for Plan Intent
 

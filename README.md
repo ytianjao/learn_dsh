@@ -41,7 +41,7 @@ pnpm run e2e:keyless:web      # full browser flow against a deterministic mock p
 - `src/**`: `pnpm run build`, then restart `dsh web` — the profile links the plugin in place, so there is nothing to reinstall or re-register. / 改源码后重新构建并重启服务即可，链接都是活路径，无需重装或重新注册。
 - `client/bundle.js`: reload the browser page. / 改客户端 bundle 后刷新页面。
 - Dependency changes: `pnpm install`. / 依赖变更后重新 install。
-- `./deepseek-harness` moved forward: rebuild it, then `pnpm run verify:dsh-baseline` (bump `scripts/dsh-baseline.json` on drift, see `AGENTS.md` §13). / Harness 检出前进后重新构建并校验基线。
+- `./deepseek-harness` moved forward: rebuild it, then `pnpm run verify:dsh-baseline` (bump `scripts/dsh-baseline.json` on drift, see "When you change things" in `AGENTS.md`). / Harness 检出前进后重新构建并校验基线。
 
 ## Use
 

@@ -1,331 +1,121 @@
 # AGENTS.md — LearnLoop for DeepSeek Harness
 
-Guidance for AI coding agents working in this repository. It assumes you know nothing
-about the project. Read this before changing code.
+LearnLoop (`@learnloop/dsh-learnloop`) is a local-first learning companion shipped as a plugin
+for DeepSeek Harness (DSH) Web. One npm package holds a Cordis **Host plugin** (`src/` → `lib/`)
+and a dependency-free **Web client** (`client/bundle.js`).
 
-## 1. Project overview
+This file holds the rules that keep a change safe. Feature behavior lives in `docs/`; versions
+live in the files that own them. Do not copy either into this file — copies go stale.
 
-- **Package:** `@learnloop/dsh-learnloop` (version `0.11.0`, MIT license, pure ESM —
-  `"type": "module"`).
-- **What it is:** LearnLoop is a **local-first, long-term learning companion** delivered as
-  a plugin for **DeepSeek Harness (DSH) Web**. It guides a learner through a profile
-  interview, compiles a validated learning plan, teaches task-by-task, verifies typed
-  answers, tracks mastery, and generates/exports lesson articles.
-- **Form factor:** a single npm package that contains both a **Host plugin** (Cordis) and
-  a **dependency-free Web client** (`client/bundle.js`) that DSH loads directly.
-- **Source of truth for design intent:** the bilingual docs under `docs/` and
-  `CHANGELOG.md`. When behavior and docs disagree, check git history and the strict Zod
-  schemas in `src/types.ts` — the schemas are authoritative.
+## Where to look
 
-### Ownership boundary (the most important rule)
-
-DSH owns sessions, streaming Chat, model routing, the tool-execution runtime, and **all
-model credentials**. LearnLoop owns only the learning domain facts: projects, profiles,
-plans, evidence, mastery, review state, and generated content.
-
-**LearnLoop never reads API keys, never implements a model-provider client, and never
-calls a provider directly.** The model only ever acts through the registered LearnLoop
-tools inside the ordinary DSH Agent Loop. Do not introduce any provider/HTTP client for
-model access.
-
-## 2. Pinned toolchain (do not bump casually)
-
-These versions are pinned and verified in CI. Treat them as fixed unless you are doing an
-intentional compatibility upgrade (see §10).
-
-| Component | Pinned value |
+| Question | Source of truth |
 | --- | --- |
-| Node | `^22.19.0 \|\| >=24` |
-| pnpm | `11.7.0` (activate via `corepack`) |
-| DSH baseline | `0.2.1-alpha.1` @ commit `5badb15009ae1756c3afe0ae0cef1faafc290ccc` (linked source checkout) |
-| Cordis | `4.0.2` |
-| TypeScript | `^5.9` |
-| Zod | `^4` (runtime validation backbone) |
-| Build | `tsdown`; Tests `vitest@3`; Lint `eslint@9` + `typescript-eslint`; E2E `@playwright/test` |
+| Persisted shape, domain types, error codes | `src/types.ts` (strict Zod; beats every doc) |
+| Persistence epoch (state schema / Storage Domain / backup format) | `tests/persistence-epoch.spec.ts` pins all three; history in `CHANGELOG.md` |
+| DSH baseline version and commit | `scripts/dsh-baseline.json`; rationale in `docs/DSH_BASELINE.md`, `docs/UPSTREAM_COMPATIBILITY.md` |
+| Toolchain pins | `package.json` (`engines`, `packageManager`, `peerDependencies`) |
+| Product rules, activation, verified answers | `docs/PRODUCT_CONTRACT.md` |
+| Profile interview | `docs/PROFILE_INTERVIEW.md` |
+| Profile confirmation and plan approval | `docs/HOST_AUTHORITATIVE_REVIEWS.md` |
+| Plan adjustment | `docs/PLAN_ADJUSTMENT.md` |
+| Lesson articles and export | `docs/CONTENT_MODEL.md`, `docs/CONTENT_GENERATION.md`, `docs/CONTENT_REPOSITORY.md`, `docs/PRIVACY_AND_SHARING.md` |
+| Acceptance | `docs/CLOUD_ACCEPTANCE.md`, `docs/WEB_ACCEPTANCE.md`, `docs/ACCEPTANCE_SCENARIOS.md` |
+| Install, run, reset after a breaking epoch | `README.md` |
 
-- The single machine-readable DSH baseline is `scripts/dsh-baseline.json`. LearnLoop follows
-  the latest Harness only: `@deepseek-ai/dsh*` **peer** dependencies carry the baseline version
-  string, while **dev** dependencies `link:` into the sibling source checkout
-  (`./deepseek-harness`, a junction locally, a CI checkout in workflows), so the plugin and the
-  Host share one physical module copy. `pnpm run verify:dsh-baseline`
-  (`scripts/verify-dsh-baseline.mjs`) enforces the peer strings, the link targets' versions,
-  checkout drift against the recorded commit, and the lockfile/workflow shape.
-- Host code consumes only **public DSH seams**: Cordis `Context`, Storage Domain, Host Web
-  Server, tools, system prompt, agents, sessions, workspace registry, and user questions.
+## Invariants
 
-## 3. Repository layout
+Breaking one of these is a design change, not a refactor.
 
-```
-src/                  TypeScript Host source (compiled to lib/)
-  index.ts            Cordis plugin entry: name/inject/apply; wires storage, tools, routes, events
-  types.ts            ALL Zod schemas + inferred domain types (single source of truth)
-  domain.ts           LearnLoopDomainError, Storage Domain spec, emptyState/ensureState
-  workspace.ts        Barrel re-exporting the aggregate commands (keeps the public surface stable)
-  commands/           Aggregate commands split by namespace:
-    shared.ts         Cross-cutting helpers + the Workspace/Session command core
-    bus.ts            Atomic command bus: idempotency receipts, revision CAS, event log
-    interview.ts      Profile interview state machine, token lifecycle, recovery paths
-    profile.ts        Profile commit / confirm / preference revision / re-open
-    plan.ts           Plan versions, approval, adjustment proposals and activation
-    task.ts           Task transitions, plan-order selection, check arming
-    evidence.ts       Evidence candidates, assessment settlement, candidate discard
-    mastery.ts        Concept-level mastery ladder and per-concept rows
-    fixture.ts        Deterministic domain fixtures for tests and scripts
-  workspace-identity.ts  Canonical Workspace/Session resolution
-  http.ts             HTTP v3 handler: routes, mutation schema, domain-error → status map
-  tool.ts             learnloop_create_plan_draft tool
-  assessment-tool.ts  learnloop_assess_answer tool
-  interview-tool.ts   learnloop_ask_profile_question tool
-  plan-adjustment-tool.ts  learnloop_propose_plan_adjustment tool
-  interview-probes.ts / profile-compiler.ts / plan-intent.ts   Interview + profile/plan compile
-  tool-protocol.ts    Tool names, phase allow-list, error encoding (LEARNLOOP_TOOL_ERROR_V2)
-  tool-restriction.ts LearnLoopToolRestrictions: per-agent tool deny-list enforcement
-  prompt.ts           Session-scoped System Prompt section (phase policy, generation data)
-  evidence-bridge.ts  Captures the pre-step user answer as an Evidence Candidate
-  dsh-session-adapter.ts  Fail-closed reader for typed DSH Session events (provenance)
-  content/            Content pipeline: capture, generation, document, repository, service,
-                      schemas, markdown, hash, privacy, tool (learnloop_write_lesson_document)
-  content/publish/    Export pipeline: exporter, markdown, html, pdf, epub
-client/bundle.js      Prebuilt, dependency-free Web client (DSH loads it via __ModuleLoader__)
-tests/                Vitest suites (*.spec.ts) mirroring src; content-fixture.ts helper
-e2e/                  Playwright specs + fixtures (mock provider patch)
-scripts/              Acceptance/verify scripts (cloud acceptance, keyless E2E, baseline verify)
-docs/                 Bilingual (中文/English) design + acceptance docs
-profiles/, cordis.patch.yml   DSH profile/bundle patch files (plugin discovery)
-lib/                  Build output (gitignored; produced by `pnpm run build`)
-```
+- **DSH owns the model; LearnLoop owns learning facts.** DSH owns sessions, streaming Chat,
+  model routing, tool execution, and all credentials. LearnLoop never reads, stores, logs, or
+  transmits API keys, never implements a provider client, and never calls a provider; the model
+  acts only through LearnLoop tools inside the ordinary DSH Agent Loop. Tests, E2E, and CI are
+  keyless; live, billed runs are user opt-in and never a PR gate.
+- **Public DSH seams only.** The Host uses the Cordis services named in `inject` in
+  `src/index.ts`; the client uses DSH Web slots. Nothing reaches into DSH internals.
+- **The Host is the sole authority over state.** Every mutation is one atomic Storage Domain
+  `update` that checks a monotonic `revision` and carries an `idempotencyKey` recorded in
+  `commandReceipts`, so a retry replays the stored result instead of re-executing. Commands
+  return new objects and never mutate in place; plan versions are immutable.
+- **The model proposes, the Host compiles.** Tools accept minimal intents; the Host derives IDs,
+  dependencies, revisions, statuses, and provenance. Learner decisions — starting learning
+  mode, confirming a profile, approving a plan, approving or discarding a plan adjustment,
+  starting a task — are UI/HTTP commands, never model tools. Nothing is replaced silently.
+- **Tool access is phase-gated twice.** DSH registers tools globally, so every System Prompt
+  publishes an exact phase allow-list, and `src/tool-protocol.ts` + `src/tool-restriction.ts`
+  enforce it again at the executor. Domain phase guards remain authoritative.
+- **Model output is untrusted.** Generated articles pass the deterministic scanner in
+  `src/content/privacy.ts`; the model's own redaction is not trusted. Lesson source snapshots
+  are bounded — never raw transcripts, learner answers, system prompts, tool payloads,
+  credentials, or local paths.
+- **Strict Zod at every boundary.** `tsconfig.json` is `strict: false`; type safety comes from
+  `.strict()` Zod schemas at runtime. Do not loosen them; parse, don't cast.
+- **Persistence epochs are clean breaks.** Older states and backups are rejected. There is no
+  migration, compatibility alias, or automatic reset or deletion.
+- **HTTP v3 is local isolation, not auth.** It is same-origin over loopback; reads are
+  Workspace-scoped and foreign sessions get a redacted projection. Routes that serve files
+  resolve strictly inside Host-owned roots (`sepWithin`, `contentProjectRoot`).
 
-`src/index.ts` re-exports the public surface of nearly every module; tests and external
-consumers import from the package root (`../src/index.js` in tests).
+## Code map
 
-## 4. Runtime architecture
+Only what file names do not tell you:
 
-LearnLoop is a **Cordis plugin**. `src/index.ts` exports `name = 'learnloop'`, an `inject`
-list (`storageDomain`, `webServer`, `tools`, `systemPrompt`, `agents`, `sessions`,
-`workspaceRegistry`, `userQuestions`), and `async apply(ctx)` which:
+- `src/index.ts` — the Cordis plugin (`name`, `inject`, `apply`) and the public re-export
+  surface. Tests and consumers import from here.
+- `src/types.ts` — every Zod schema, inferred type, and `LearnLoopErrorCode`.
+- `src/workspace.ts` — barrel over `src/commands/*`, the aggregate commands split by
+  namespace. `src/commands/bus.ts` is the atomic command bus (receipts, revision CAS, events).
+- `src/http.ts` — the v3 handler: mutation union on `action`, `statusByCode`,
+  `BACKUP_FORMAT_VERSION`.
+- `src/tool-protocol.ts` — tool names, phase contracts, and the error-code → recovery mapping
+  the model sees.
+- `src/evidence-bridge.ts`, `src/dsh-session-adapter.ts` — capture the learner's answer from
+  DSH events and check its provenance, fail-closed.
+- `src/content/` — the lesson pipeline; `publish/` holds the exporters.
+- `client/bundle.js` — hand-authored source with no build step; edit it directly. Specs run it
+  in a `node:vm` sandbox.
 
-1. Opens the Storage Domain and ensures the singleton state row exists, then reconciles
-   interrupted content jobs and pending profile questions.
-2. Registers the four model tools, the session-scoped System Prompt section, and the HTTP
-   routes (each via `ctx.effect`, so they are cleaned up on dispose).
-3. Subscribes to DSH lifecycle events (`agent/pre-step`, `session/event`, `agent/created`,
-   `agent/session-start`, `agent/disposed`, `tools/change`, `tools/result`) to capture
-   answers, consume profile-fallback messages, and keep per-agent tool restrictions in sync.
-
-The **Host is the sole authority over state.** Every mutation runs inside one atomic
-Storage Domain `update`, checks a monotonic `revision`, and is idempotent via an
-`idempotencyKey` recorded in `commandReceipts` (so a retried command replays its stored
-result instead of re-executing).
-
-## 5. Persistence & state model
-
-- **Storage Domain** `learnloop`, version `12`, one table `state`, one row `singleton`.
-- **State schema 15** (`learnLoopStateSchema` in `src/types.ts`): root is exactly
-  `{ schemaVersion, revision, settings, workspaces, commandReceipts }`. All schemas use
-  `.strict()`; unknown keys are rejected.
-- **Hierarchy:** `workspaces[workspaceId]` → `projects[projectId]`. A **Project** is the
-  aggregate that owns its profile, immutable plan versions, execution, evidence candidates,
-  verified assessments/evidence, mastery, misconceptions, and a
-  content index. A **Session** is only the current execution attachment — changing sessions
-  does not move or copy a project. Task dependencies are derived from plan order; tasks
-  carry no explicit dependency field.
-- **Content files:** private lesson source snapshots and canonical lesson documents are
-  immutable, schema-validated JSON files stored under
-  `$DSH_HOME/learnloop/content/ws-<hash>/project-<hash>` via `ContentRepository`. Main state
-  stores only references, capture requests, generation jobs, and export records.
-- **Backup format 9** (`BACKUP_FORMAT_VERSION` in `src/http.ts`) exports only the canonical
-  Workspace aggregate plus current settings.
-
-### Breaking epochs
-
-Every state-schema epoch is a **clean break**: older persisted states and backup formats
-are intentionally unsupported, with **no automatic migration, reset, or deletion**. When
-you change the persisted shape, bump the state schema, Storage Domain version, and backup
-format together, and record the epoch in `CHANGELOG.md`. See the README "Breaking upgrades"
-section for the user-facing reset procedure.
-
-## 6. HTTP API v3 (same-origin, loopback)
-
-Routes are registered in `src/index.ts` and handled by `createLearnLoopHttpHandler` in
-`src/http.ts`:
-
-- `GET/POST /learnloop/api/v3/state` — Workspace-scoped state projection (GET); domain
-  mutations (POST, a strict Zod discriminated union on `action`).
-- `GET/POST /learnloop/api/v3/manage` — management projection and `update-settings` /
-  `clear-project`.
-- `GET /learnloop/api/v3/export` — owner backup download.
-- `GET /learnloop/api/v3/lesson` — rendered article preview (HTML).
-- `GET /learnloop/api/v3/export-file` — export ZIP download.
-
-Conventions:
-
-- Reads are scoped by `workspaceId`; the server returns a redacted projection to
-  non-owner sessions. This is **local product-state isolation, not multi-user auth**.
-- Mutations require canonical Workspace/Session ownership, an optimistic
-  `expectedWorkspaceRevision` / root revision check, and an `idempotencyKey`. The product
-  contract (see `docs/PRODUCT_CONTRACT.md`) requires same-origin, JSON content type, and a
-  bounded request size; DSH Web binds loopback and serves the same-origin client.
-- Errors are `LearnLoopDomainError` with a stable `code`; `statusByCode` maps codes to HTTP
-  statuses (default `409`). Model/tool errors are encoded via `LEARNLOOP_SAFE_ERROR` /
-  `LEARNLOOP_TOOL_ERROR_V2` so the model gets an actionable, non-leaking message.
-- Preview/download routes resolve paths strictly within recorded Host-owned locations
-  (`sepWithin`) to prevent path escape.
-
-## 7. Agent / model protocol
-
-Five tools are registered globally (DSH registers tools globally), so LearnLoop
-publishes an exact **phase allow-list** in each System Prompt and independently enforces it
-at the tool-executor/domain boundary (`tool-protocol.ts` + `tool-restriction.ts`):
-
-- `learnloop_ask_profile_question` — ask the current Host-owned profile question (opaque token);
-  the model phrases the wording, the Host validates it and falls back to its own.
-- `learnloop_create_plan_draft` — submit a minimal Plan Intent; the Host compiles IDs,
-  dependencies, revisions, and status.
-- `learnloop_assess_answer` — validate every acceptance criterion for the armed answer.
-- `learnloop_write_lesson_document` — submit a structured `LessonDocumentIntent` (once per task).
-- `learnloop_propose_plan_adjustment` — submit a revised Plan Intent while the plan is **active**;
-  the Host compiles it into a new immutable draft version that the learner must approve. Never
-  replaces the running plan silently.
-
-Key flows:
-
-- **Activation:** the only entry point is the UI's **Start learning mode** button → HTTP
-  `begin-learning-mode` → an `interviewing` Project. No onboarding tool is exposed to the
-  model.
-- **Verified Answer Loop:** arming a task captures the next direct user message as an
-  Evidence Candidate; `learnloop_assess_answer` must cover every criterion exactly once.
-  `needs-work` keeps the task active and writes no Evidence; `passed`/`excellent`
-  atomically writes Assessment + Evidence + Mastery + task completion + a durable lesson
-  capture record. The next task still requires an explicit start.
-- **Content pipeline:** `Plan → LessonSourceSnapshot → LessonDocument → Publication`.
-  After a task passes, a capture request materializes a private, bounded snapshot (never the
-  raw transcript or learner answers); the Host wakes the owning Agent; the model submits only
-  a `LessonDocumentIntent`; the Host validates structure, Markdown safety, privacy, and
-  reference-link provenance, then derives identity/sequence/slug/revision/provenance and
-  stores the immutable document. Export writes Markdown, static HTML, PDF (local
-  Chromium-family browser), EPUB, and a combined ZIP.
-- **Reviews are Host-authoritative:** profile confirmation and plan approval are explicit
-  UI/HTTP commands, not model tools. Plan approval activates the plan but leaves every task
-  pending.
-
-## 8. Build & test commands
+## Commands
 
 ```bash
-corepack enable
-pnpm install --frozen-lockfile
-
-pnpm run build         # tsdown → lib/ (ESM + d.ts + sourcemaps)
-pnpm run typecheck     # tsc --noEmit
-pnpm run lint          # eslint src tests --max-warnings 0
-pnpm test              # vitest run (all tests/**/*.spec.ts)
-pnpm run check         # typecheck + node --check client/bundle.js + test  (run before PR)
+corepack enable && pnpm install --frozen-lockfile
+pnpm run build                # tsdown: src/ → lib/ (never touches client/bundle.js)
+pnpm run lint                 # eslint src tests --max-warnings 0
+pnpm run check                # typecheck + node --check client/bundle.js + vitest; run before a PR
+pnpm run verify:dsh-baseline  # CI gate: peer strings, link targets, checkout drift, lockfile
+pnpm run e2e:keyless:web      # self-contained browser E2E against a deterministic mock provider
 ```
 
-Focused suites (used by CI):
+Focused suites and acceptance scripts are in `package.json` `scripts`; CI jobs are in
+`.github/workflows/`.
 
-```bash
-pnpm run test:unit               # tests/domain.spec.ts
-pnpm run test:integration        # tests/http.spec.ts
-pnpm run test:runtime            # assessment-tool + evidence-bridge + prompt
-pnpm run test:evidence / test:assessment / test:prompt
-pnpm run test:upstream-contract  # tests/upstream-contract.spec.ts
-pnpm run verify:dsh-baseline     # pinned-DSH consistency across package.json/lockfile/CI
-pnpm run verify:article-export   # real article + export artifacts in a temp dir
-pnpm run package:validate        # npm pack --dry-run
-```
+## Code style
 
-Browser E2E and acceptance (keyless — they use a deterministic mock provider and never
-touch real credentials):
+- TypeScript ESM with `NodeNext`; local imports carry the `.js` extension.
+- Dense: no semicolons, compact arrow functions, minimal vertical whitespace. Match the
+  surrounding code and never reformat existing code.
+- Throw `LearnLoopDomainError` with a stable `LearnLoopErrorCode`.
+- Code comments and identifiers are English. UI copy, docs, and CHANGELOG entries are bilingual
+  (简体中文 / English); keep the pairing.
+- Tests build state through the same aggregate commands the Host uses, never hand-written state
+  literals; shared helpers are in `tests/content-fixture.ts`.
 
-```bash
-pnpm run e2e:keyless:web         # orchestrates build + mock provider + dsh web + Playwright
-pnpm run test:e2e                # Playwright against an already-running DSH Web
-pnpm run acceptance:prepare      # isolated, keyless DSH Web profile (uses $DSH_HOME)
-pnpm run acceptance:web          # start loopback DSH Web for acceptance
-pnpm run acceptance:reset        # clean up the isolated acceptance profile
-```
+## When you change things
 
-## 9. Testing strategy
-
-- **Unit/integration:** Vitest (`tests/**/*.spec.ts`, V8 coverage). Suites mirror `src/`
-  modules and construct state through the same aggregate commands the Host uses; shared
-  helpers live in `tests/content-fixture.ts`. Tests import from the package root.
-- **Contract tests:** `tests/upstream-contract.spec.ts` pins the public DSH tool/session
-  surfaces LearnLoop relies on.
-- **Browser E2E:** Playwright (`e2e/`), driven keylessly by `scripts/keyless-web-e2e.mjs`
-  with the deterministic `scripts/learner-first-mock-provider.mjs`. Real DeepSeek endpoints
-  are blocked; no key is ever present.
-- **CI:** `.github/workflows/ci.yml` (build+typecheck, lint, unit-domain,
-  unit-runtime-http-tool, full-suite with `check` + `package:validate`) and
-  `.github/workflows/web-e2e.yml` (checks out the pinned DSH source, builds it, runs the
-  keyless Web E2E, uploads reports on failure).
-- **Cloud acceptance:** `scripts/cloud-acceptance-*.sh` plus `.devcontainer/` provide an
-  isolated, repeatable environment (`DSH_HOME` isolation). Manual scenarios are in
-  `docs/ACCEPTANCE_SCENARIOS.md`; live/billed behavior is user-opt-in and never a PR gate.
-
-## 10. Code style & conventions
-
-- **Language:** TypeScript, ESM, `module`/`moduleResolution: NodeNext`. Import local files
-  with the `.js` extension (e.g. `from './domain.js'`).
-- **Compiler is `strict: false`** (see `tsconfig.json`); **type safety is enforced at
-  runtime by strict Zod schemas** instead. Preserve the `.strict()` schemas and validate at
-  every boundary — do not loosen them, and prefer parsing over casting.
-- **Formatting:** the codebase is densely written — **no semicolons**, compact arrow
-  functions, minimal vertical whitespace, single-line expressions where readable. Match the
-  surrounding style; do not reformat existing code.
-- **Lint:** only `no-constant-condition` is enabled as an error, with `--max-warnings 0`.
-- **Immutability:** domain commands return new state objects (spread/map), never mutate in
-  place; plans are immutable versions.
-- **Errors:** throw `LearnLoopDomainError` with a stable `LearnLoopErrorCode`; keep the
-  code list in `src/types.ts` and the `statusByCode` map in `src/http.ts` in sync.
-- **Language of artifacts:** code comments and identifiers are English. User-facing web
-  copy and many docs/CHANGELOG entries are **bilingual (简体中文 / English)** — keep that
-  pairing when you touch UI strings or documentation.
-
-## 11. Security & privacy considerations
-
-- **Never handle credentials.** No code may read, store, log, or transmit model API keys.
-  Automated tests and E2E are entirely keyless.
-- **Content privacy:** a deterministic Host scanner (`src/content/privacy.ts`) rejects any
-  generated article containing internal identifiers (workspace/project/session/message/lesson
-  ids), Host control markers, API-key shapes, or absolute local paths. The model's own
-  redaction is not trusted. Reference links are accepted only if the URL literally appears in
-  the captured teaching content.
-- **Snapshots are bounded:** they retain only explicitly bounded assistant text and accepted
-  assessment/evidence facts — never raw transcripts, learner answers, system prompts, tool
-  payloads, credentials, or local paths.
-- **Path containment:** preview/export/download resolve strictly within recorded Host-owned
-  directories (`sepWithin`, `contentProjectRoot`).
-- **Exports are sensitive:** backups and exported articles contain learning data; treat them
-  as sensitive.
-- **HTTP boundary:** same-origin, strict runtime schemas, bounded request size, monotonic
-  revision checks, and idempotent receipts. Foreign sessions receive a redacted projection.
-
-## 12. Install & run (for manual verification)
-
-```bash
-# Prerequisite: the Harness source checkout must exist at ./deepseek-harness (junction or
-# clone) and be built — see README "Install from zero".
-pnpm install && pnpm run build
-pnpm exec dsh plugin --profile web add .   # register the plugin into the DSH web profile
-pnpm exec dsh web                          # start DSH Web, open the printed ?token= URL
-```
-
-Use the isolated acceptance flow (`pnpm run acceptance:prepare` / `acceptance:web`) for a
-clean, keyless environment instead of your real `DSH_HOME`.
-
-## 13. When you change things
-
-- Changing the **persisted shape** → bump state schema + Storage Domain version + backup
-  format together and log a new breaking epoch in `CHANGELOG.md`. No migrations.
-- Changing the **DSH baseline** → pull `./deepseek-harness` forward, rebuild it
-  (`pnpm --dir deepseek-harness install && pnpm --dir deepseek-harness run build`), update
-  `scripts/dsh-baseline.json` (version + commit) and the `@deepseek-ai/dsh*` **peer** version
-  strings, then rerun `pnpm install`, build, typecheck, lint, the full test suite, and the
-  real Web acceptance. Keep `docs/UPSTREAM_COMPATIBILITY.md` and `docs/DSH_BASELINE.md`
-  current. `pnpm run verify:dsh-baseline` fails when the checkout drifts from the recorded
-  commit.
-- Adding a **tool** → register it in `src/index.ts`, add its name and phase contract in
-  `src/tool-protocol.ts`, and cover it with schema + recovery tests.
-- Editing **UI copy or docs** → preserve the 中文/English bilingual pairing.
-- Keep `README.md`, `docs/`, and this file accurate as behavior evolves.
+- **Persisted shape** → bump the state schema (`src/types.ts`), the Storage Domain version
+  (`src/domain.ts`), and `BACKUP_FORMAT_VERSION` (`src/http.ts`) together; update
+  `tests/persistence-epoch.spec.ts`; record the breaking epoch in `CHANGELOG.md` and on the
+  README "Current epoch" line. No migrations.
+- **DSH baseline** → pull `./deepseek-harness` forward and rebuild it
+  (`pnpm --dir deepseek-harness install && pnpm --dir deepseek-harness run build`); update
+  `scripts/dsh-baseline.json` and the `@deepseek-ai/dsh*` peer strings; `pnpm install`; then
+  build, lint, `check`, `verify:dsh-baseline`, and the real Web acceptance. Keep
+  `docs/DSH_BASELINE.md` and `docs/UPSTREAM_COMPATIBILITY.md` current.
+- **New tool** → register it in `src/index.ts`, add its name and phase contract to
+  `src/tool-protocol.ts`, and cover its schema and recovery paths with tests.
+- **New error code** → add it to `LearnLoopErrorCode`, map its HTTP status in `statusByCode`
+  (default `409`), and classify its recovery in `src/tool-protocol.ts`. Unclassified codes fall
+  back to `do-not-retry`, which strands the model on errors it could repair.
+- **Behavior** → update the matching `docs/` file and `CHANGELOG.md`. This file changes only
+  when a rule or a change procedure does.

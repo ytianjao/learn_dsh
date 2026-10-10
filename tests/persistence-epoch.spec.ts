@@ -3,7 +3,7 @@ import {BACKUP_FORMAT_VERSION,emptyState,learnLoopDomainSpec,learnLoopStateSchem
 
 /**
  * Guards the three version numbers that must move together when the persisted shape changes
- * (AGENTS.md §13). They live in three different files with nothing checking them against each
+ * (AGENTS.md, "When you change things"). They live in three different files with nothing checking them against each
  * other, so a missed bump previously surfaced only as a deserialization failure at runtime.
  */
 describe('persistence epoch versions',()=>{
