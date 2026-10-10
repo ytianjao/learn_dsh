@@ -4,6 +4,11 @@ LearnLoop (`@learnloop/dsh-learnloop`) is a local-first learning companion shipp
 for DeepSeek Harness (DSH) Web. One npm package holds a Cordis **Host plugin** (`src/` → `lib/`)
 and a dependency-free **Web client** (`client/bundle.js`).
 
+The Harness source is built beside this repo at `../deepseek-harness`. The `@deepseek-ai/*`
+devDependencies link to it for build and tests; at runtime the plugin uses whichever `dsh`
+loads it, which for local work is that same build installed as the global `dsh` (README).
+No DSH package comes from npm.
+
 This file holds the rules that keep a change safe. Feature behavior lives in `docs/`; versions
 live in the files that own them. Do not copy either into this file — copies go stale.
 
@@ -107,8 +112,8 @@ Focused suites and acceptance scripts are in `package.json` `scripts`; CI jobs a
   (`src/domain.ts`), and `BACKUP_FORMAT_VERSION` (`src/http.ts`) together; update
   `tests/persistence-epoch.spec.ts`; record the breaking epoch in `CHANGELOG.md` and on the
   README "Current epoch" line. No migrations.
-- **DSH baseline** → pull `./deepseek-harness` forward and rebuild it
-  (`pnpm --dir deepseek-harness install && pnpm --dir deepseek-harness run build`); update
+- **DSH baseline** → pull `../deepseek-harness` forward and rebuild it
+  (`pnpm --dir ../deepseek-harness install && pnpm --dir ../deepseek-harness run build`); update
   `scripts/dsh-baseline.json` and the `@deepseek-ai/dsh*` peer strings; `pnpm install`; then
   build, lint, `check`, `verify:dsh-baseline`, and the real Web acceptance. Keep
   `docs/DSH_BASELINE.md` and `docs/UPSTREAM_COMPATIBILITY.md` current.

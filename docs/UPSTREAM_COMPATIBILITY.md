@@ -1,8 +1,8 @@
 # 上游兼容性 / Upstream compatibility
 
 The single machine-readable baseline is `scripts/dsh-baseline.json`. LearnLoop tracks the
-latest Harness at the linked source checkout (`./deepseek-harness`), currently version
-`0.2.1-alpha.1` at verified commit `5badb15009ae1756c3afe0ae0cef1faafc290ccc`.
+latest Harness at the source checkout beside this repo (`../deepseek-harness`), currently
+version `0.2.1-alpha.1` at verified commit `5badb15009ae1756c3afe0ae0cef1faafc290ccc`.
 
 | LearnLoop | DSH | Commit | Node | pnpm | Cordis | Known limitation |
 | --- | --- | --- | --- | --- | --- | --- |
