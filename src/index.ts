@@ -2,19 +2,22 @@
 import { readFileSync } from 'node:fs'
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-host-webserver'
-import type {} from '@deepseek-ai/dsh-storage-domain'
+import type { Domain } from '@deepseek-ai/dsh-storage-domain'
 import type {} from '@deepseek-ai/dsh-tools'
 import type {} from '@deepseek-ai/dsh-system-prompt'
 import type {} from '@deepseek-ai/dsh-workspace'
 import type {} from '@deepseek-ai/dsh-user-questions'
 import { emptyState, ensureState, learnLoopDomainSpec } from './domain.js'
+import { incompatibleStorage, moveIncompatibleStorageAside, createIncompatibleStorageHandler } from './storage-recovery.js'
 import { API_PATH, EXPORT_FILE_PATH, EXPORT_PATH, LESSON_PATH, MANAGE_PATH, createLearnLoopHttpHandler, type ContentServices } from './http.js'
 import type { StateTable } from './types.js'
 import { createLearnLoopCreatePlanDraftTool } from './tool.js'
 import {LearnLoopToolRestrictions} from './tool-restriction.js'
 import { createLearnLoopAssessmentTool } from './assessment-tool.js'
 import { createLearnLoopPlanAdjustmentTool } from './plan-adjustment-tool.js'
-import { renderLearnLoopSystemSection, sessionIdFromAssembleContext } from './prompt.js'
+import { createLearnLoopReleaseCheckTool } from './release-check-tool.js'
+import { createLearnLoopGetPlanTool } from './plan-read-tool.js'
+import { renderLearnLoopRuntimeContext, renderLearnLoopSystemSection, sessionIdFromAssembleContext } from './prompt.js'
 import { capturePreStepAnswer, enrichCandidateEvent } from './evidence-bridge.js'
 import {consumeProfileFallbackMessage,reconcileProfileInterviewQuestions} from './workspace.js'
 import { resolveCanonicalWorkspace } from './workspace-identity.js'
@@ -31,6 +34,7 @@ import {dshHomePath} from '@deepseek-ai/dsh-home-paths'
 
 export * from './workspace-identity.js'
 export * from './domain.js'
+export * from './storage-recovery.js'
 export * from './http.js'
 export * from './types.js'
 export * from './tool.js'
@@ -38,6 +42,8 @@ export * from './tool-protocol.js'
 export * from './prompt.js'
 export * from './assessment-tool.js'
 export * from './plan-adjustment-tool.js'
+export * from './release-check-tool.js'
+export * from './plan-read-tool.js'
 export * from './evidence-bridge.js'
 export * from './message-source.js'
 export * from './workspace.js'
@@ -62,7 +68,28 @@ export const name = 'learnloop'
 export const inject = ['storageDomain', 'webServer', 'tools', 'systemPrompt', 'agents', 'sessions', 'workspaceRegistry', 'userQuestions']
 
 export async function apply(ctx: Context): Promise<void> {
-  const domain = await ctx.storageDomain.open(learnLoopDomainSpec)
+  let domain: Domain<typeof learnLoopDomainSpec>
+  try { domain = await ctx.storageDomain.open(learnLoopDomainSpec) } catch (error) {
+    // A stored state of another epoch must not take dsh web down: start degraded and let the
+    // learner move the stale file aside from the UI. Nothing is reset on its own.
+    const stale = incompatibleStorage(error)
+    if (!stale) throw error
+    ctx.logger('learnloop').warn({ code: 'STORAGE_EPOCH_INCOMPATIBLE', ...stale }, 'LearnLoop storage is from another epoch; waiting for the learner to clear it')
+    let routes: Array<() => unknown> = []
+    const handler = createIncompatibleStorageHandler(stale, async () => {
+      const backupFile = moveIncompatibleStorageAside()
+      const fresh = await ctx.storageDomain.open(learnLoopDomainSpec)
+      for (const dispose of routes) await dispose()
+      await start(ctx, fresh)
+      return backupFile
+    })
+    routes = [API_PATH, EXPORT_PATH, MANAGE_PATH, LESSON_PATH, EXPORT_FILE_PATH].map(path => ctx.effect(() => ctx.webServer.register({ kind: 'exact', path, handler }), 'learnloop.incompatibleStorageRoute()'))
+    return
+  }
+  await start(ctx, domain)
+}
+
+async function start(ctx: Context, domain: Domain<typeof learnLoopDomainSpec>): Promise<void> {
   const table = domain.table('state') as StateTable
   await ensureState(table)
   await table.update('singleton',state=>reconcileContentJobs(reconcileProfileInterviewQuestions(state,liveProfileQuestionCalls)))
@@ -74,12 +101,16 @@ export async function apply(ctx: Context): Promise<void> {
   ctx.effect(() => ctx.systemPrompt.section({ name: 'learnloop-runtime', order: 50, text: context => {
     const sessionId=sessionIdFromAssembleContext(context)
     if(!sessionId)ctx.logger('learnloop').debug({code:'PROMPT_AGENT_CONTEXT_MISSING'},'Runtime prompt omitted: agent context missing')
-    return renderLearnLoopSystemSection(table.get('singleton') ?? emptyState(),sessionId,readLessonSnapshot)
+    return renderLearnLoopSystemSection(table.get('singleton') ?? emptyState(),sessionId)
   } }), 'learnloop.systemPrompt()')
+  // Changing state goes to the runtime context, which DSH re-appends only when its text differs.
+  ctx.effect(() => ctx.systemPrompt.context({ name: 'learnloop-state', order: 300, text: context => renderLearnLoopRuntimeContext(table.get('singleton') ?? emptyState(),sessionIdFromAssembleContext(context),readLessonSnapshot) }), 'learnloop.runtimeContext()')
   ctx.effect(() => ctx.tools.register(createLearnLoopCreatePlanDraftTool(table, workspaceResolver)), 'learnloop.createPlanDraftTool()')
   ctx.effect(() => ctx.tools.register(createLearnLoopProfileQuestionTool(table,ctx.userQuestions,sessionReader)), 'learnloop.profileQuestionTool()')
   ctx.effect(() => ctx.tools.register(createLearnLoopAssessmentTool(table, sessionReader)), 'learnloop.assessmentTool()')
+  ctx.effect(() => ctx.tools.register(createLearnLoopReleaseCheckTool(table)), 'learnloop.releaseCheckTool()')
   ctx.effect(() => ctx.tools.register(createLearnLoopPlanAdjustmentTool(table)), 'learnloop.planAdjustmentTool()')
+  ctx.effect(() => ctx.tools.register(createLearnLoopGetPlanTool(table)), 'learnloop.getPlanTool()')
   ctx.effect(() => ctx.tools.register(createLearnLoopWriteLessonDocumentTool(table, sessionReader, repositoryFor)), 'learnloop.writeLessonDocumentTool()')
   let eventWrites:Promise<unknown> = Promise.resolve()
   ctx.on('agent/pre-step', async (payload, next) => {await eventWrites;return capturePreStepAnswer(table, String(payload.agent.id), payload.signal, next)})
@@ -87,7 +118,7 @@ export async function apply(ctx: Context): Promise<void> {
     if (event.type !== 'user/message') return
     eventWrites = eventWrites.then(() => table.update('singleton', state => {const enriched=enrichCandidateEvent(state,String(session.id),event.data,event.seq);if(event.data.source.kind!=='user')return enriched;const text=event.data.content.filter(block=>block.type==='text').map(block=>block.text).join('\n').trim();return consumeProfileFallbackMessage(enriched,{sessionId:String(session.id),messageId:String(event.data.id),eventSeq:event.seq,text})})).then(state=>{sync(state,[String(session.id)])},error => { ctx.logger('learnloop').error(error, 'Failed to consume user message provenance') })
   })
-  const restrictions=new LearnLoopToolRestrictions()
+  const restrictions=new LearnLoopToolRestrictions(()=>table.get('singleton'))
   let syncing=false,scheduled=false
   const sync=(state=table.get('singleton')??emptyState(),sessionIds?:readonly string[])=>{syncing=true;try{for(const agent of ctx.agents.list())if(!sessionIds||sessionIds.includes(String(agent.id)))restrictions.sync(agent,state)}finally{syncing=false}}
   const scheduleSync=()=>{if(syncing||scheduled)return;scheduled=true;queueMicrotask(()=>{scheduled=false;sync()})}

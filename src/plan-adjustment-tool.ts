@@ -50,7 +50,7 @@ export function createLearnLoopPlanAdjustmentTool(table: StateTable) {
     },
     output: {
       schema: { type: 'object', additionalProperties: false, properties: { status: { type: 'string', const: 'proposed', required: true }, planId: { type: 'string', required: true }, planVersion: { type: 'integer', required: true } } },
-      render: (_args, value) => [{ type: 'text', text: `Plan revision ${value.planVersion} (planId=${value.planId}) awaits explicit learner approval; keep teaching the current Task until the learner approves it.` }],
+      render: (_args, value) => [{ type: 'text', text: `Plan revision version ${value.planVersion} awaits explicit learner approval in the LearnLoop Plan view; keep teaching the current Task until the learner approves it.` }],
     },
     finalizeContent: finalizeLearnLoopToolError,
     async execute(args, exec) {

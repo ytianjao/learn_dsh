@@ -12,15 +12,15 @@ describe('persistence epoch versions',()=>{
   const domainVersion = learnLoopDomainSpec.version
   const backupVersion = BACKUP_FORMAT_VERSION
   // Each epoch raises all three by exactly one from the 15/12/9 baseline, so the offsets are fixed.
-  expect(schemaVersion).toBe(18)
-  expect(domainVersion).toBe(15)
-  expect(backupVersion).toBe(12)
+  expect(schemaVersion).toBe(19)
+  expect(domainVersion).toBe(16)
+  expect(backupVersion).toBe(13)
   expect(schemaVersion - 15).toBe(domainVersion - 12)
   expect(schemaVersion - 15).toBe(backupVersion - 9)
  })
  it('builds an empty state that already satisfies the current schema',()=>{
   const state = emptyState()
-  expect(state.schemaVersion).toBe(18)
+  expect(state.schemaVersion).toBe(19)
   expect(learnLoopStateSchema.parse(state)).toEqual(state)
  })
 })

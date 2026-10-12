@@ -5,6 +5,7 @@ import {interviewTopics, learnLoopStateSchema, type Assessment, type CriterionAs
 import {activeProject,fail,now,requireToolPhase,workspaceForSession,workspaceOf} from './shared.js'
 import {applyWorkspaceCommand} from './bus.js'
 import {masteryRowsForPlan} from './mastery.js'
+import {DONE_TASK_STATUSES} from './task.js'
 export function requestWorkspacePlanRevision(state:LearnLoopState,input:{workspaceId:string;projectId:string;sessionId:string;expectedRevision:number;planId:string;idempotencyKey:string;reason:string}){return applyWorkspaceCommand(state,input,'workspace:request-plan-revision',input,(w,p)=>{if(!p||p.phase!=='plan_review'||!input.reason.trim())fail('PLAN_REVISION_REQUEST_INVALID','A current Draft and revision reason are required.');const draft=p.plans.find(x=>x.status==='draft');if(!draft||draft.id!==input.planId)fail('PLAN_REVISION_REQUEST_INVALID','Plan revision does not match current Draft.');const at=now();return{...w,projects:{...w.projects,[p.id]:{...p,phase:'planning',plans:p.plans.map(x=>x.id===draft.id?{...x,status:'archived' as const}:x),pendingPlanRevisionRequest:{reason:input.reason.trim(),requestedAt:at},updatedAt:at}}}})}
 export function createPlanDraftFromIntent(state: LearnLoopState, input: { sessionId: string; callId: string; plan: PlanIntent }) {
  const workspace = workspaceForSession(state, input.sessionId)
@@ -68,8 +69,8 @@ export function proposePlanAdjustment(state:LearnLoopState,input:{sessionId:stri
   for(const version of active.plans)for(const stage of version.stages)for(const task of stage.tasks)if(task.conceptKey)conceptKeyByConceptId.set(task.conceptKey.trim().toLowerCase(),task.conceptId)
   const plan=compilePlanIntent(intent,active.profile,{planVersion:Math.max(0,...active.plans.map(value=>value.version))+1,conceptIds:conceptKeyByConceptId})
   const at=now()
-  // Tasks already completed stay completed: a revision may not un-complete verified work.
-  const completed=new Map(active.plans.find(v=>v.id===active.activePlanId)?.stages.flatMap(s=>s.tasks).filter(t=>t.status==='completed'||t.status==='skipped').map(t=>[t.title.trim().toLowerCase(),t.status])??[])
+  // Completed, skipped, and studied Tasks keep their status: a revision may not undo finished work.
+  const completed=new Map(active.plans.find(v=>v.id===active.activePlanId)?.stages.flatMap(s=>s.tasks).filter(t=>DONE_TASK_STATUSES.includes(t.status)).map(t=>[t.title.trim().toLowerCase(),t.status])??[])
   const reconciled={...plan,stages:plan.stages.map(stage=>({...stage,tasks:stage.tasks.map(task=>({...task,status:completed.get(task.title.trim().toLowerCase())??task.status}))}))}
   const changed={...active,plans:[...active.plans,reconciled],pendingPlanAdjustment:{reason:input.reason.trim(),proposedAt:at,planId:reconciled.id},updatedAt:at}
   return{...current,projects:{...current.projects,[changed.id]:changed}}

@@ -1,10 +1,11 @@
 import {describe,expect,it} from 'vitest'
-import {activeProject,beginWorkspaceOnboarding,consumeProfileFallbackMessage,createLearnLoopProfileQuestionTool,emptyState,probeDefinition,renderLearnLoopSystemSection,workspaceOf,type InterviewProbeId,type LearnLoopState} from '../src/index.js'
+import {activeProject,beginWorkspaceOnboarding,consumeProfileFallbackMessage,createLearnLoopProfileQuestionTool,emptyState,probeDefinition,workspaceOf,type InterviewProbeId,type LearnLoopState} from '../src/index.js'
 
 /**
  * Interview evaluation harness. A deterministic scripted learner answers by Host code while a
- * "model policy" drives learnloop_ask_profile_question from the same host-control JSON a real
- * model reads. The null policy (token only) is the baseline every model must match: a noisy
+ * "model policy" drives learnloop_ask_profile_question from the same tool results a real model
+ * reads: no contract before the first call (the Host asks its current question), then each result's
+ * nextQuestion. The null policy (token only) is the baseline every model must match: a noisy
  * model may lose its enhancements but never changes what the profile means, and an enhancing
  * model changes only wording, the optional Probes it adds (and labels), and supplementary context.
  */
@@ -13,7 +14,6 @@ type Policy=(contract:Contract,step:number)=>Record<string,unknown>
 type Option={code:string;label:string}
 type Learner=(probeId:InterviewProbeId,options:Option[],purpose:'probe'|'follow-up',attempt:number)=>{selected:string[];custom?:string}
 const BASELINE=['goal.subject','goal.outcome','current-foundation.relevant-experience','learning-mode.style','time-budget.weekly-hours']
-const controlJson=(state:LearnLoopState)=>{const section=renderLearnLoopSystemSection(state,'s'),json=section.split('<learnloop-host-control-json>\n')[1]!.split('\n</learnloop-host-control-json>')[0]!;return JSON.parse(json).currentQuestion as Contract}
 
 const policies:Record<'null'|'enhanced'|'noisy',Policy>={
  null:contract=>({questionToken:contract.token}),
@@ -44,19 +44,20 @@ async function runInterview(policy:Policy,learner:Learner){
  const table={get:()=>state,put:async()=>{},update:async(_id:string,fn:(s:LearnLoopState)=>LearnLoopState)=>(state=fn(state))}
  const attempts=new Map<string,number>();let nativeAsks=0,rejected=0,schemaRetries=0,seq=10
  const interview=()=>activeProject(workspaceOf(state,'ws')).profileInterview
- const tool=createLearnLoopProfileQuestionTool(table as never,{ask:async request=>{nativeAsks++;const q=interview().activeQuestion!,key=`${q.purpose}:${q.probeId}`,attempt=attempts.get(key)??0;attempts.set(key,attempt+1);return{answers:[{id:request.questions[0]!.id,...learner(q.probeId,q.options,q.purpose,attempt)}]}}},{tailSeq:()=>seq} as never) as never as {execute:(args:unknown,exec:unknown)=>Promise<{enhancement:{rejected:unknown[]}}>;finalizeContent:(exec:unknown,result:unknown)=>Array<{text:string}>}
+ const tool=createLearnLoopProfileQuestionTool(table as never,{ask:async request=>{nativeAsks++;const q=interview().activeQuestion!,key=`${q.purpose}:${q.probeId}`,attempt=attempts.get(key)??0;attempts.set(key,attempt+1);return{answers:[{id:request.questions[0]!.id,...learner(q.probeId,q.options,q.purpose,attempt)}]}}},{tailSeq:()=>seq} as never) as never as {execute:(args:unknown,exec:unknown)=>Promise<{enhancement:{rejected:unknown[]};nextQuestion?:Contract}>;finalizeContent:(exec:unknown,result:unknown)=>Array<{text:string}>}
+ let contract:Contract|null=null
  for(let step=0;activeProject(workspaceOf(state,'ws')).phase==='interviewing';step++){
   if(step>60)throw new Error('interview did not converge')
   const awaiting=interview().awaitingChatProbeId
-  if(awaiting){state=consumeProfileFallbackMessage(state,{sessionId:'s',messageId:`chat-${step}`,eventSeq:(interview().fallbackAfterSeq??0)+1,text:chatReply[awaiting]??'不知道'});continue}
+  if(awaiting){contract=null;state=consumeProfileFallbackMessage(state,{sessionId:'s',messageId:`chat-${step}`,eventSeq:(interview().fallbackAfterSeq??0)+1,text:chatReply[awaiting]??'不知道'});continue}
   const exec={agent:{id:'s'},callId:`call-${step}`}
-  try{rejected+=(await tool.execute(policy(controlJson(state),step),exec)).enhancement.rejected.length}
+  try{const result=await tool.execute(contract?policy(contract,step):{},exec);rejected+=result.enhancement.rejected.length;contract=result.nextQuestion??null}
   catch(error){
    // A schema-level mistake fails before LearnLoop code runs; the error hands back the token to retry with.
    if((error as {code?:string}).code!=='INVALID_ARGS')throw error
    schemaRetries++
    const text=tool.finalizeContent(exec,{isError:true,error:{message:String((error as Error).message),info:{code:'INVALID_ARGS'}}})[0]!.text,retryWith=JSON.parse(text.split('<learnloop-tool-error-json>\n')[1]!.split('\n</learnloop-tool-error-json>')[0]!).details.retryWith
-   rejected+=(await tool.execute(retryWith,{agent:{id:'s'},callId:`retry-${step}`})).enhancement.rejected.length
+   const result=await tool.execute(retryWith,{agent:{id:'s'},callId:`retry-${step}`});rejected+=result.enhancement.rejected.length;contract=result.nextQuestion??null
   }
   seq+=5
  }

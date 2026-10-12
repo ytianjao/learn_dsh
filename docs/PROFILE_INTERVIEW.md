@@ -37,15 +37,15 @@ One learning-style answer sets both plan gates: read-only → knowledge-first, n
 
 ## 模型增强 / Model enhancements
 
-`learnloop_ask_profile_question` 只要求 `questionToken`。可选增强（附带 `probeId` 以绑定到对应题目）：
+`learnloop_ask_profile_question` 只需要 `questionToken`，而且可以省略：首次提问或手里没有令牌时不传，Host 会提出当前题目；之后传上一次结果中的 `nextQuestionToken`。每次结果都会返回刚记录的回答（`answer`）和下一题的契约（`nextQuestion`），模型据此改写，运行时上下文中不再携带题目。可选增强（附带 `probeId` 以绑定到对应题目）：
 
-- `addProbes`：从 `currentQuestion.optionalProbes` 中追加可选题，例如学习者提到考试日期时追加期限。
+- `addProbes`：从 `nextQuestion.optionalProbes` 中追加可选题，例如学习者提到考试日期时追加期限。
 - `question`：按学习者的说法改写题干。
-- `options`：为既有编码改写贴合主题的文字；不能新增、删除或重排编码；多选题可为同一编码追加最多 3 个变体。
+- `options`：为既有编码改写贴合主题的文字；不能新增、删除或重排编码，标记为 `relabel:false` 的互斥编码（如“完全没接触过”）不能改写；多选题可为同一编码追加最多 3 个变体。
 - `assume`：仅限可推断的题、首次提问、整场最多 3 次；不发提问，记为模型推断，在下一题和审阅页中提示学习者确认。目标、期望目标、相关经验、学习方式、成功标准永远不可推断。
 - `followUp`：针对上一题回答的一道补充问题，每个主题最多 1 道、整场最多 3 道；结果进入补充回答，不改变规范字段。
 
-`learnloop_ask_profile_question` requires only `questionToken`. Optional enhancements (echo `probeId` to bind them): `addProbes` adds optional Probes from `currentQuestion.optionalProbes`, e.g. the deadline when the learner mentions an exam date; `question` rewords the Probe; `options` relabels existing codes for the subject (never invent, drop, or reorder codes; multi-select Probes accept up to 3 extra labels); `assume` records an assumption instead of asking — inferable Probes only, first ask only, at most 3 per interview, shown for confirmation; the goal, outcome, experience, learning style, and success criteria are never inferable; `followUp` asks one extra question about the previous answer — at most one per topic and three per interview — stored as supplementary context.
+`learnloop_ask_profile_question` needs only `questionToken`, and it may be omitted: on the first question, or without a token in hand, the Host asks its current question; afterwards pass the previous result's `nextQuestionToken`. Each result returns the answer just recorded (`answer`) and the next question contract (`nextQuestion`), which the model enhances from; the runtime context carries no question. Optional enhancements (echo `probeId` to bind them): `addProbes` adds optional Probes from `nextQuestion.optionalProbes`, e.g. the deadline when the learner mentions an exam date; `question` rewords the Probe; `options` relabels existing codes for the subject (never invent, drop, or reorder codes, and never relabel an exclusive code marked `relabel:false`; multi-select Probes accept up to 3 extra labels); `assume` records an assumption instead of asking — inferable Probes only, first ask only, at most 3 per interview, shown for confirmation; the goal, outcome, experience, learning style, and success criteria are never inferable; `followUp` asks one extra question about the previous answer — at most one per topic and three per interview — stored as supplementary context.
 
 优先级：followUp → assume → 提问；`addProbes` 在每个分支都会生效。被拒绝的增强会列在 `enhancement.rejected` 中并改用 Host 默认；结果还会返回下一题的契约（`nextQuestion`）。只有过期的 token 才会失败。
 

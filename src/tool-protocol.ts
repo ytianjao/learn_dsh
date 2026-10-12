@@ -7,24 +7,37 @@ export const LEARNLOOP_TOOL_ERROR_MARKER='LEARNLOOP_TOOL_ERROR_V2'
 export const LEARNLOOP_SAFE_ERROR_MARKER='LEARNLOOP_SAFE_ERROR:'
 export type RecoveryKind='correct-and-retry'|'ask-follow-up'|'fallback-to-chat'|'refresh-state'|'wait-for-user'|'do-not-retry'
 export interface LearnLoopToolErrorEnvelope{version:2;code:string;category:'pre-execution'|'domain'|'conflict'|'infrastructure';message:string;recovery:{kind:RecoveryKind;maxAttempts:number};details?:Record<string,unknown>}
-export type LearnLoopToolName='learnloop_ask_profile_question'|'learnloop_create_plan_draft'|'learnloop_assess_answer'|'learnloop_write_lesson_document'|'learnloop_propose_plan_adjustment'
-export const LEARNLOOP_TOOL_NAMES:readonly LearnLoopToolName[]=['learnloop_ask_profile_question','learnloop_create_plan_draft','learnloop_assess_answer','learnloop_write_lesson_document','learnloop_propose_plan_adjustment']
+export type LearnLoopToolName='learnloop_ask_profile_question'|'learnloop_create_plan_draft'|'learnloop_assess_answer'|'learnloop_release_check'|'learnloop_get_plan'|'learnloop_write_lesson_document'|'learnloop_propose_plan_adjustment'
+export const LEARNLOOP_TOOL_NAMES:readonly LearnLoopToolName[]=['learnloop_ask_profile_question','learnloop_create_plan_draft','learnloop_assess_answer','learnloop_release_check','learnloop_get_plan','learnloop_write_lesson_document','learnloop_propose_plan_adjustment']
 export interface LearnLoopToolContract{visibleProjectPhases:readonly string[];visibleExecutionPhases?:readonly string[];executableProjectPhases:readonly string[];executableExecutionPhases?:readonly string[]}
 export const LEARNLOOP_TOOL_CONTRACTS:Readonly<Record<LearnLoopToolName,LearnLoopToolContract>>={
  learnloop_ask_profile_question:{visibleProjectPhases:['interviewing'],executableProjectPhases:['interviewing']},
  learnloop_create_plan_draft:{visibleProjectPhases:['planning'],executableProjectPhases:['planning']},
  learnloop_assess_answer:{visibleProjectPhases:['active'],visibleExecutionPhases:['awaiting-answer','verifying'],executableProjectPhases:['active'],executableExecutionPhases:['verifying']},
+ learnloop_release_check:{visibleProjectPhases:['active'],visibleExecutionPhases:['awaiting-answer','verifying'],executableProjectPhases:['active'],executableExecutionPhases:['verifying']},
  learnloop_write_lesson_document:{visibleProjectPhases:['active','completed'],executableProjectPhases:['active','completed']},
+ learnloop_get_plan:{visibleProjectPhases:['active'],executableProjectPhases:['active']},
  learnloop_propose_plan_adjustment:{visibleProjectPhases:['active'],executableProjectPhases:['active']}}
 const contractAllows=(contract:LearnLoopToolContract,project:LearningProject,mode:'visible'|'executable')=>{const projects=mode==='visible'?contract.visibleProjectPhases:contract.executableProjectPhases,executions=mode==='visible'?contract.visibleExecutionPhases:contract.executableExecutionPhases;return projects.includes(project.phase)&&(!executions||executions.includes(project.execution?.phase??''))}
 export const toolAllowed=(name:LearnLoopToolName,project:LearningProject,mode:'visible'|'executable')=>contractAllows(LEARNLOOP_TOOL_CONTRACTS[name],project,mode)&&(name!=='learnloop_write_lesson_document'||Boolean(project.content.activeGenerationJobId))
 export const executablePhasesForTool=(name:LearnLoopToolName)=>LEARNLOOP_TOOL_CONTRACTS[name].executableExecutionPhases??LEARNLOOP_TOOL_CONTRACTS[name].executableProjectPhases
-export interface AgentToolPolicy{allowedLearnLoopTools:readonly LearnLoopToolName[];allowNativeQuestion:boolean}
-export function deriveAgentToolPolicy(project:LearningProject|null):AgentToolPolicy{if(!project)return{allowedLearnLoopTools:[],allowNativeQuestion:false};return{allowedLearnLoopTools:LEARNLOOP_TOOL_NAMES.filter(name=>toolAllowed(name,project,'visible')&&(name!=='learnloop_ask_profile_question'||Boolean(project.profileInterview.pendingQuestion&&!project.profileInterview.awaitingChatProbeId&&!project.profileInterview.activeQuestion))),allowNativeQuestion:false}}
+/**
+ * declaredLearnLoopTools stays fixed for a learning session: hiding tools per phase rewrote the
+ * provider's tool declarations and broke its prefix cache. Phase gating is the allow-list in the
+ * runtime context plus the executor guard in tool-restriction.ts, which rejects other calls.
+ */
+export interface AgentToolPolicy{declaredLearnLoopTools:readonly LearnLoopToolName[];allowedLearnLoopTools:readonly LearnLoopToolName[];allowNativeQuestion:boolean}
+export function deriveAgentToolPolicy(project:LearningProject|null):AgentToolPolicy{if(!project)return{declaredLearnLoopTools:[],allowedLearnLoopTools:[],allowNativeQuestion:false};return{declaredLearnLoopTools:LEARNLOOP_TOOL_NAMES,allowedLearnLoopTools:LEARNLOOP_TOOL_NAMES.filter(name=>toolAllowed(name,project,'visible')&&(name!=='learnloop_ask_profile_question'||Boolean(project.profileInterview.pendingQuestion&&!project.profileInterview.awaitingChatProbeId&&!project.profileInterview.activeQuestion))),allowNativeQuestion:false}}
 export const allowedLearnLoopToolsForPhase=(project:LearningProject|null)=>deriveAgentToolPolicy(project).allowedLearnLoopTools
+/** Tools the current step must call one of; empty where every LearnLoop tool is optional (teaching may only propose). */
+export function requiredLearnLoopTools(project:LearningProject|null):LearnLoopToolName[]{
+ if(!project)return[]
+ const allowed=allowedLearnLoopToolsForPhase(project),required:LearnLoopToolName[]=project.phase==='interviewing'?['learnloop_ask_profile_question']:project.phase==='planning'?['learnloop_create_plan_draft']:project.phase==='active'&&project.execution?.phase==='verifying'?['learnloop_assess_answer','learnloop_release_check']:project.content.activeGenerationJobId?['learnloop_write_lesson_document']:[]
+ return required.filter(name=>allowed.includes(name))
+}
 const RETRYABLE_DOMAIN_CODES=['ASSESSMENT_INVALID','INVALID_PLAN','CANDIDATE_NOT_READY','CANDIDATE_SOURCE_MISSING','EVIDENCE_MISMATCH','EMPTY_PROFILE_PATCH','PLAN_APPROVAL_MISMATCH','INVALID_ARGS']
 const STATE_CODES=['INTERVIEW_QUESTION_STALE','INTERVIEW_TOPIC_MISMATCH','INTERVIEW_QUESTION_RELEASED','INTERVIEW_QUESTION_CONTRACT_INVALID','INTERVIEW_BATCH_NOT_ALLOWED','REVISION_CONFLICT','INVALID_PROJECT_PHASE','TASK_LOCKED','INVALID_TASK_TRANSITION','CHECK_NOT_ARMED','CHECK_ALREADY_ARMED','PROJECT_NOT_FOUND','TASK_NOT_FOUND','CANDIDATE_NOT_FOUND','WORKSPACE_NOT_FOUND']
-const INFRASTRUCTURE_CODES=['CALLER_NOT_LIVE','DELEGATED_CALLER','NO_PROVIDER','INTERNAL_ERROR']
+const INFRASTRUCTURE_CODES=['CALLER_NOT_LIVE','STORAGE_EPOCH_INCOMPATIBLE','DELEGATED_CALLER','NO_PROVIDER','INTERNAL_ERROR']
 type ToolErrorPolicy=Pick<LearnLoopToolErrorEnvelope,'category'|'recovery'>
 const directive=(code:string):ToolErrorPolicy=>{const candidates:Array<ToolErrorPolicy|null>=[
  // The model can repair its own arguments and rubric coverage in one more attempt.

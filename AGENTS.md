@@ -47,9 +47,16 @@ Breaking one of these is a design change, not a refactor.
   dependencies, revisions, statuses, and provenance. Learner decisions — starting learning
   mode, confirming a profile, approving a plan, approving or discarding a plan adjustment,
   starting a task — are UI/HTTP commands, never model tools. Nothing is replaced silently.
-- **Tool access is phase-gated twice.** DSH registers tools globally, so every System Prompt
-  publishes an exact phase allow-list, and `src/tool-protocol.ts` + `src/tool-restriction.ts`
-  enforce it again at the executor. Domain phase guards remain authoritative.
+- **Tool access is phase-gated twice, without hiding tools.** The runtime state publishes the exact
+  phase allow-list, and the executor guard in `src/tool-restriction.ts` rejects any other LearnLoop
+  tool before it runs; domain phase guards remain authoritative. A learning session declares every
+  LearnLoop tool for its whole life: toggling declarations per phase rewrote the provider's tool list
+  and broke its prefix cache.
+- **The system section is static; changing state is runtime context.** DSH appends a changed system
+  prompt to the cached history, so `renderLearnLoopSystemSection` must not vary within a learning
+  session. Phase, allow-list, and phase data go to `renderLearnLoopRuntimeContext`
+  (`systemPrompt.context`), which DSH re-appends only when its text changes: keep it to what the
+  phase needs and free of per-step values. Data a turn rarely needs is a read tool, not context.
 - **Model output is untrusted.** Generated articles pass the deterministic scanner in
   `src/content/privacy.ts`; the model's own redaction is not trusted. Lesson source snapshots
   are bounded — never raw transcripts, learner answers, system prompts, tool payloads,
@@ -57,7 +64,10 @@ Breaking one of these is a design change, not a refactor.
 - **Strict Zod at every boundary.** `tsconfig.json` is `strict: false`; type safety comes from
   `.strict()` Zod schemas at runtime. Do not loosen them; parse, don't cast.
 - **Persistence epochs are clean breaks.** Older states and backups are rejected. There is no
-  migration, compatibility alias, or automatic reset or deletion.
+  migration, compatibility alias, or automatic reset or deletion. A stale stored state must not
+  stop `dsh web`: `src/storage-recovery.ts` starts LearnLoop degraded, and only the learner's
+  explicit reset moves the file aside to `learnloop/stale-backups/`. That reset is the one place
+  LearnLoop touches the DSH storage file directly (DSH has no public API to drop a unit).
 - **HTTP v3 is local isolation, not auth.** It is same-origin over loopback; reads are
   Workspace-scoped and foreign sessions get a redacted projection. Routes that serve files
   resolve strictly inside Host-owned roots (`sepWithin`, `contentProjectRoot`).

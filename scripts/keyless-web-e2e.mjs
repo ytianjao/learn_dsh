@@ -1,4 +1,4 @@
-import {spawn} from 'node:child_process'
+import {spawn,spawnSync} from 'node:child_process'
 import {createServer} from 'node:net'
 import {mkdtemp,open,readFile,rm,writeFile} from 'node:fs/promises'
 import {tmpdir} from 'node:os'
@@ -34,6 +34,8 @@ async function ready(name,url,child,logPath,timeoutMs=60_000){
  throw new Error(`${name} readiness timed out at ${url}; last observation: ${last}; log: ${logPath}`)
 }
 async function stop(entry){
+ // On Windows the child is the pnpm wrapper; killing only its pid orphans dsh web, so take the whole tree.
+ if(process.platform==='win32'&&entry.child.exitCode===null){spawnSync('taskkill',['/PID',String(entry.child.pid),'/T','/F'],{stdio:'ignore'});await Promise.race([new Promise(resolve=>entry.child.once('exit',resolve)),new Promise(resolve=>setTimeout(resolve,5_000))])}
  if(entry.child.exitCode===null){try{process.kill(process.platform==='win32'?entry.child.pid:-entry.child.pid,'SIGTERM')}catch(error){if(error?.code!=='ESRCH')console.error(`cleanup ${entry.name}:`,error)}await Promise.race([new Promise(resolve=>entry.child.once('exit',resolve)),new Promise(resolve=>setTimeout(resolve,5_000))]);if(entry.child.exitCode===null)try{process.kill(process.platform==='win32'?entry.child.pid:-entry.child.pid,'SIGKILL')}catch{}}
  await entry.log.close()
 }
