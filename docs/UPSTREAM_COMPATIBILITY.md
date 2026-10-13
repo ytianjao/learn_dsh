@@ -1,8 +1,8 @@
 # 上游兼容性 / Upstream compatibility
 
 The single machine-readable baseline is `scripts/dsh-baseline.json`. LearnLoop tracks the
-latest Harness at the linked source checkout (`./deepseek-harness`), currently version
-`0.2.1-alpha.1` at verified commit `5badb15009ae1756c3afe0ae0cef1faafc290ccc`.
+latest Harness at the source checkout beside this repo (`../deepseek-harness`), currently
+version `0.2.1-alpha.1` at verified commit `5badb15009ae1756c3afe0ae0cef1faafc290ccc`.
 
 | LearnLoop | DSH | Commit | Node | pnpm | Cordis | Known limitation |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -39,7 +39,7 @@ Verified-answer integration is constrained to pinned DSH 0.2.1-alpha.1 public ag
 
 ## Canonical persistence boundary (0.2.0)
 
-Schema 15 stores business data only at `workspaces[workspaceId].projects[projectId]`. Projects independently own profile, plans, execution, candidates, verified evidence and assessments, mastery, and misconceptions. `activeSessionId` is an execution attachment, not ownership. API v3 reads by Workspace; storage domain 12 rejects earlier LearnLoop states. No code automatically resets or deletes DSH data.
+The state stores business data only at `workspaces[workspaceId].projects[projectId]`. Projects independently own profile, plans, execution, candidates, verified evidence and assessments, mastery, and misconceptions. `activeSessionId` is an execution attachment, not ownership. API v3 reads by Workspace; the current Storage Domain version rejects states from earlier epochs (see `CHANGELOG.md`). No code automatically resets or deletes DSH data.
 
 ## rc.8 Tool schema audit for Plan Intent
 

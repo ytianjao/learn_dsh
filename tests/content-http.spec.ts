@@ -1,5 +1,6 @@
 import {PassThrough} from 'node:stream'
-import {mkdtemp} from 'node:fs/promises'
+import {mkdir,mkdtemp,writeFile} from 'node:fs/promises'
+import {existsSync} from 'node:fs'
 import {tmpdir} from 'node:os'
 import {join} from 'node:path'
 import {describe,expect,it} from 'vitest'
@@ -73,5 +74,14 @@ describe('content HTTP actions',()=>{
   const reply=await call(handler,'POST','/learnloop/api/v3/state',{action:'export-articles',workspaceId:'ws',projectId,sessionId:'s',expectedWorkspaceRevision:workspaceOf(table.get('singleton')!,'ws').revision,idempotencyKey:'export-http-x',scope:'lesson',taskId:taskIds[0],outputDirectory:tmpdir()})
   expect(reply.status).toBe(404)
   expect(JSON.parse(reply.body).error.code).toBe('CONTENT_DOCUMENT_NOT_FOUND')
+ })
+ it('clear-project deletes the project lesson directory together with its state',async()=>{
+  const{table,repo,handler,projectId}=await contentFixture()
+  await mkdir(join(repo.root,'lessons'),{recursive:true});await writeFile(join(repo.root,'lessons','lesson.json'),'{}')
+  const reply=await call(handler,'POST','/learnloop/api/v3/manage',{action:'clear-project',workspaceId:'ws',projectId,expectedWorkspaceRevision:workspaceOf(table.get('singleton')!,'ws').revision,idempotencyKey:'clear-1'})
+  expect(reply.status).toBe(200)
+  expect(JSON.parse(reply.body).contentRemoved).toBe(true)
+  expect(existsSync(repo.root)).toBe(false)
+  expect(workspaceOf(table.get('singleton')!,'ws').projects[projectId]).toBeUndefined()
  })
 })

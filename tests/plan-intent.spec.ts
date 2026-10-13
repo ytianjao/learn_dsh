@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {completeProfileInterviewFixture, activeProject, approveWorkspacePlan, beginWorkspaceOnboarding, commitWorkspaceProfile, compilePlanIntent, confirmWorkspaceProfile, createPlanDraftFromIntent, emptyState, requestPlanDraftRevision, validatePlanIntent, workspaceOf } from '../src/index.js'
+import {completeProfileInterviewFixture, activeProject, approveWorkspacePlan, beginWorkspaceOnboarding, compilePlanIntent, confirmWorkspaceProfile, createPlanDraftFromIntent, emptyState, requestPlanDraftRevision, validatePlanIntent, workspaceOf, finalizeLearnLoopToolError, renderLearnLoopRuntimeContext } from '../src/index.js'
 
 const intent = { stages: [{ title: 'Foundations', outcome: 'Understand boundaries.', tasks: [
   { title: 'Explain state', objective: 'Explain the boundary.', activity: 'explain' as const, acceptanceCriteria: ['Explain global state.'], checkPrompt: 'Explain the boundary.', estimateMinutes: 30 },
@@ -8,8 +8,8 @@ const intent = { stages: [{ title: 'Foundations', outcome: 'Understand boundarie
 function planning() {
   let state = beginWorkspaceOnboarding(emptyState(), { workspaceId: 'ws', sessionId: 'session', expectedRevision: 0, idempotencyKey: 'begin' })
   const projectId = workspaceOf(state, 'ws').activeProjectId!
-  state = completeProfileInterviewFixture(state, 'ws'); state = commitWorkspaceProfile(state, { workspaceId: 'ws', projectId, sessionId: 'session', expectedRevision: 1, idempotencyKey: 'profile', goal: 'Learn', targetOutcome:'Target outcome', priorKnowledge: '', experienceLevel: 'beginner', knowledgeGaps: [], learningMode: 'balanced', practiceCapacity: 'none', weeklyHours: 4, constraints: [], successCriteria: ['Explain'], unansweredQuestions: [] })
-  return confirmWorkspaceProfile(state, { workspaceId: 'ws', projectId, sessionId: 'session', profileRevision: 1, expectedRevision: 2, idempotencyKey: 'confirm' })
+  state = completeProfileInterviewFixture(state, 'ws', { 'goal.subject': 'Learn', 'learning-mode.style': ['read-only'] })
+  return confirmWorkspaceProfile(state, { workspaceId: 'ws', projectId, sessionId: 'session', profileRevision: activeProject(workspaceOf(state, 'ws')).profileRevision, expectedRevision: workspaceOf(state, 'ws').revision, idempotencyKey: 'confirm' })
 }
 describe('Plan Intent compiler', () => {
   it('generates canonical identities in a deterministic linear order', () => {
@@ -31,7 +31,7 @@ describe('Plan Intent compiler', () => {
     let state = createPlanDraftFromIntent(planning(), { sessionId: 'session', callId: 'call', plan: intent })
     const original = state.commandReceipts.find(receipt => receipt.idempotencyKey === 'plan-draft:call')!.result
     const project = activeProject(workspaceOf(state, 'ws'))
-    state = approveWorkspacePlan(state, { workspaceId: 'ws', projectId: project.id, planId: project.plans[0]!.id, expectedRevision: 4, idempotencyKey: 'approve', sessionId: 'session' })
+    state = approveWorkspacePlan(state, { workspaceId: 'ws', projectId: project.id, planId: project.plans[0]!.id, expectedRevision: workspaceOf(state, 'ws').revision, idempotencyKey: 'approve', sessionId: 'session' })
     const replayed = createPlanDraftFromIntent(state, { sessionId: 'session', callId: 'call', plan: intent })
     expect(replayed).toBe(state)
     expect(replayed.commandReceipts.find(receipt => receipt.idempotencyKey === 'plan-draft:call')!.result).toEqual(original)
@@ -46,7 +46,19 @@ describe('Plan Intent compiler', () => {
     state = createPlanDraftFromIntent(state, { sessionId: 'session', callId: 'v2', plan: intent })
     const project = activeProject(workspaceOf(state, 'ws'))
     expect(project.plans.map(plan => [plan.version, plan.status])).toEqual([[1, 'archived'], [2, 'draft']])
-    expect(() => approveWorkspacePlan(state, { workspaceId: 'ws', projectId: project.id, planId: project.plans[0]!.id, expectedRevision: 6, idempotencyKey: 'old', sessionId: 'session' })).toThrowError(expect.objectContaining({ code: 'PLAN_APPROVAL_MISMATCH' }))
+    expect(() => approveWorkspacePlan(state, { workspaceId: 'ws', projectId: project.id, planId: project.plans[0]!.id, expectedRevision: workspaceOf(state, 'ws').revision, idempotencyKey: 'old', sessionId: 'session' })).toThrowError(expect.objectContaining({ code: 'PLAN_APPROVAL_MISMATCH' }))
+  })
+  it('names the violated rule in the tool error and publishes the profile-derived constraints before drafting', () => {
+    const state = planning(), profile = activeProject(workspaceOf(state, 'ws')).profile!
+    const withApply = { stages: [{ ...intent.stages[0]!, tasks: [...intent.stages[0]!.tasks, { ...intent.stages[0]!.tasks[0]!, title: 'Judge a framework', activity: 'apply' as const }] }] }
+    let message = ''
+    try { validatePlanIntent(withApply, profile) } catch (error) { message = (error as Error).message }
+    const text = (finalizeLearnLoopToolError({} as never, { isError: true, error: { message, info: { code: 'INVALID_PLAN' } } } as never) as Array<{ text: string }>)[0]!.text
+    const envelope = JSON.parse(text.split('<learnloop-tool-error-json>\n')[1]!.split('\n</learnloop-tool-error-json>')[0]!)
+    expect(envelope).toMatchObject({ code: 'INVALID_PLAN', recovery: { kind: 'correct-and-retry' } })
+    expect(envelope.details.violation).toContain('"Judge a framework"')
+    const control = JSON.parse(renderLearnLoopRuntimeContext(state, 'session').split('<learnloop-host-control-json>\n')[1]!.split('\n</learnloop-host-control-json>')[0]!)
+    expect(control.planConstraints).toEqual({ allowedActivities: ['explain', 'example'], minExplainOrExampleShare: 0.6, exampleInEveryStage: false, maxTotalMinutes: profile.weeklyHours * 60 * 52 })
   })
   it('rejects malformed and preference-invalid intents without mutation', () => {
     const state = planning(), profile = activeProject(workspaceOf(state, 'ws')).profile!
@@ -65,8 +77,8 @@ describe('Plan Intent compiler', () => {
       { stages: [{ ...intent.stages[0], tasks: intent.stages[0]!.tasks.map(task => ({ ...task, acceptanceCriteria: Array(9).fill('criterion') })) }] },
     ]
     expect(malformed).toHaveLength(28)
-    let rejected = 0, mutations = 0
-    for (const value of malformed) { try { validatePlanIntent(value, profile) } catch { rejected++ } if (state.revision !== 3) mutations++ }
+    let rejected = 0, mutations = 0; const baseline = state.revision
+    for (const value of malformed) { try { validatePlanIntent(value, profile) } catch { rejected++ } if (state.revision !== baseline) mutations++ }
     expect({ total: malformed.length, rejectedBeforeExecute: rejected, unexpectedExecuteCount: malformed.length - rejected, stateMutationCount: mutations }).toEqual({ total: 28, rejectedBeforeExecute: 28, unexpectedExecuteCount: 0, stateMutationCount: 0 })
   })
 })

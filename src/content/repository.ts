@@ -35,4 +35,6 @@ export class ContentRepository{
     if(canonicalJson(existing)!==canonicalJson(value))throw new Error('CONTENT_REPOSITORY_ERROR')
   }
   async readJson<T>(relativePath:string,schema:ZodType<T>):Promise<T>{try{return schema.parse(JSON.parse(await readFile(this.path(relativePath),'utf8')))}catch{throw new Error('CONTENT_FILE_INVALID')}}
+  /** Deletes the whole project directory. Only clear-project calls it, after the state commit. */
+  async removeAll():Promise<void>{await rm(this.root,{recursive:true,force:true,maxRetries:3})}
 }

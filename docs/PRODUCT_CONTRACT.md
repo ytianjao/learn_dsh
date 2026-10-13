@@ -58,9 +58,14 @@ DSH owns session, Chat, model routing, streaming, credentials, and the tool exec
 ## LearnLoop Runtime V2 contract
 
 - **User message:** visible and intent-only; retains the learner's original semantics and never contains LearnLoop control prompts or state JSON.
-- **System Prompt:** Host-generated, session-scoped, recorded in DSH request/header and Trajectory, and supplies planning, learning-mode, and progression constraints.
-- **Hard gate:** `Task N != completed => Task N+1 cannot become active`. Only domain commands advance plan state; model prose has no completion authority.
+- **System Prompt:** Host-generated and session-scoped. The LearnLoop section (`LEARNLOOP_RUNTIME_V10`) is static for a learning session: the fixed policy and every phase policy, keyed by phase, so DSH never re-appends it. / LearnLoop 系统提示词分区在一个学习会话内保持不变：固定规则加按阶段列出的全部阶段规则，DSH 因此不会重复追加。
+- **Runtime state:** the changing part is a runtime-context block (`LEARNLOOP_STATE_V1`) with the phase, `allowedTools`, `requiredTools` (empty where every LearnLoop tool is optional, such as teaching), `planConstraints`, and only the data the phase needs. DSH appends it only when its text changes. The interview question contract and the recorded answer travel in tool results; the full plan is read on demand with `learnloop_get_plan`. / 变化的部分放在运行时上下文块中：阶段、允许的工具、必须调用的工具（讲解等可选阶段为空）、计划约束，以及该阶段需要的数据；只有文本变化时 DSH 才追加。访谈题目契约与刚记录的回答随工具结果返回；完整计划通过 `learnloop_get_plan` 按需读取。
+- **Tool declarations:** a learning session declares every LearnLoop tool throughout; a call the phase does not allow is rejected before it runs with `INVALID_PROJECT_PHASE` (`refresh-state`). / 学习会话始终声明全部 LearnLoop 工具；当前阶段不允许的调用会在执行前以 `INVALID_PROJECT_PHASE` 拒绝。
+- **Hard gate:** `Task N not in {completed, skipped, studied} => Task N+1 cannot become active`. Only domain commands advance plan state; model prose has no completion authority.
+- **Optional check:** the learner may finish the current Task without a check (`finish-task-without-check`, from teaching, an armed check, or needs-revision). The Task becomes `studied`: it unlocks the next Task but writes no assessment, evidence, or mastery, and it has no lesson article (articles need an accepted assessment). `recheck-task` makes a studied Task current again so the check can be taken later, while no other Task is current. / 学习者可以不做检查直接结束当前任务（`finish-task-without-check`，可在讲解中、检查已武装或需要修订时使用）。任务变为 `studied`：会解锁下一任务，但不写入评估、证据或掌握度，也不会生成课文（课文需要已通过的评估）。在没有其它当前任务时，`recheck-task` 可让已学任务重新成为当前任务以补做检查。
+- **Questions during a check:** an armed check captures the next learner message. If it is a question, a request, or off-topic, the verifier calls `learnloop_release_check`: the check returns to teaching, no assessment is written, and the attempt is not counted. Any attempt to answer, however wrong, is still assessed. / 检查武装后会捕获学习者的下一条消息。若该消息是提问、请求或无关内容，评测方调用 `learnloop_release_check`：检查回到讲解，不写评估，也不计入尝试次数。任何作答尝试（无论多错）仍会被评估。
 - **Mode gate:** `practiceCapacity=none => no implementation task and no artifact completion requirement`.
+- **Plan constraints:** while planning or active, the runtime state carries `planConstraints` (`allowedActivities`, `minExplainOrExampleShare`, `exampleInEveryStage`, `maxTotalMinutes`), derived from the confirmed Profile by the same function that validates the Plan Intent. An `INVALID_PLAN` tool error carries `details.violation` naming the broken rule and, for the mode gate, the offending tasks.
 - **Migration:** v1 projects, plans, evidence, and mastery are retained; tasks receive safe lesson/short-answer defaults and projects require explicit session binding.
 - **Current limitation:** no semantic post-filter rewrites arbitrary provider output. The deterministic state gate is enforced locally while recurring teaching behavior is constrained through DSH System Prompt. Inline checkpoints use the placeholder message range `learnloop-inline-checkpoint`.
 
@@ -77,15 +82,15 @@ Invariants: `project.sessionId === mutation.sessionId`; active and blocked curre
 - **Assessment:** every acceptance criterion has exactly one criterion result.
 - **Completion:** `task.status === completed` implies a verified assessment result of `passed` or `excellent`.
 - **Visibility:** the answer appears as an ordinary Chat user message; verifier policy appears only in System Prompt/trajectory.
-- **Mastery:** one passed answer produces at most `demonstrated`; `mastered` requires future cross-time review.
+- **Mastery:** one passed answer produces `practicing` and never `mastered`; a concept reaches `mastered` only by accumulating three verified evidence items including a formal assessment, which for a shared concept means more than one Task.
 - **Backup:** only the owner Session can export a complete project backup.
 
-Verified Answer Loop v1 accepts text only. It does not automatically verify images or artifacts, implement mastered retention, or rewrite arbitrary model prose. Model judgment can still be wrong; the host nevertheless enforces provenance, complete criterion coverage, and state boundaries.
+Verified Answer Loop v1 accepts text only. It does not automatically verify images or artifacts, or rewrite arbitrary model prose. Mastery is evidence-count based rather than time-decayed: `nextReviewAt` is recorded but no spaced-review scheduler consumes it yet. Model judgment can still be wrong; the host nevertheless enforces provenance, complete criterion coverage, and state boundaries.
 
 
 ## Canonical persistence boundary (0.2.0)
 
-Schema 15 stores business data only at `workspaces[workspaceId].projects[projectId]`. Projects independently own profile, plans, execution, candidates, verified evidence and assessments, mastery, and misconceptions. `activeSessionId` is an execution attachment, not ownership. API v3 reads by Workspace; storage domain 12 rejects earlier LearnLoop states. No code automatically resets or deletes DSH data.
+The state stores business data only at `workspaces[workspaceId].projects[projectId]`. Projects independently own profile, plans, execution, candidates, verified evidence and assessments, mastery, and misconceptions. `activeSessionId` is an execution attachment, not ownership. API v3 reads by Workspace; the current Storage Domain version rejects states from earlier epochs (see `CHANGELOG.md`). No code automatically resets or deletes DSH data.
 
 ## Canonical Plan Intent contract (0.5.0)
 
@@ -98,7 +103,7 @@ are rejected rather than migrated or silently reset.
 
 ## Current LearnLoop interaction protocol
 
-Activation is Host-owned: button → HTTP `begin-learning-mode` → `interviewing` Project → visible learner intent. The agent interviews, commits and obtains explicit Profile confirmation, creates a Draft Plan, and asks the learner to **确认并启用计划 / Confirm and activate plan**. After confirmation the Plan is active, execution is null, and all Tasks remain pending. Teaching starts only after the learner explicitly starts the first Task in LearnLoop. LearnLoop phase policy and domain guards reject wrong-phase model calls with `INVALID_PROJECT_PHASE`; model-visible outputs use semantic fields such as `profileRevision`, `planId`, and `planVersion`, never a generic workspace revision.
+Activation is Host-owned: button → HTTP `begin-learning-mode` → `interviewing` Project → visible learner intent. The agent drives the Host-defined interview, the Host compiles the Profile and obtains explicit Profile confirmation, the agent creates a Draft Plan, and asks the learner to **确认并启用计划 / Confirm and activate plan**. After confirmation the Plan is active, execution is null, and all Tasks remain pending. Teaching starts only after the learner explicitly starts the first Task in LearnLoop. LearnLoop phase policy and domain guards reject wrong-phase model calls with `INVALID_PROJECT_PHASE`; model-visible outputs use semantic fields such as `profileRevision`, `planId`, and `planVersion`, never a generic workspace revision.
 
 ### Upstream rc.8 limitations
 
@@ -108,11 +113,11 @@ DSH rc.8 exposes Agent-scoped `agent.ctx.tools.restrict({ deny })` and `guard()`
 
 Task execution has one primary entry in the conversation composer. The plan view is read-only for task execution: it presents stages, task state, Evidence, and Mastery without start/check/pause/resume/skip controls. `derivePrimaryLearningAction` maps Project, Session, and execution state to the only current action.
 
-The phase policy permits profile commit while interviewing; profile commit/confirmation/preference revision in profile review; plan draft creation and explicit preference revision while planning; plan revision, explicit preference revision, and approval in plan review; and assessment only while awaiting an answer or verifying. Native questions are limited to interviewing, profile review, and plan review. Teaching and needs-revision prohibit shadow quizzes.
+The phase policy permits the Host interview tool while interviewing; profile confirmation or a revision request in profile review; plan draft creation and explicit preference revision while planning; plan revision, explicit preference revision, and approval in plan review; and assessment only while awaiting an answer or verifying. Native questions are limited to interviewing, profile review, and plan review. Teaching and needs-revision prohibit shadow quizzes.
 
-Preference revision is learner-initiated, increments the Profile revision, clears confirmation, archives a draft, and returns to profile review. Plan validation otherwise repairs Plan Intent within confirmed constraints. A general request for relevant industry examples remains `standard`; `high` requires explicit dense or every-stage wording.
+Preference revision is learner-initiated, increments the Profile revision, clears confirmation, archives a draft, and returns to profile review. Plan validation otherwise repairs Plan Intent within confirmed constraints. Example density is `high` only when the learner picks the Host option `example-rich`; no learner or model wording is interpreted.
 
-Command receipts store canonical Profile commit/confirmation/preference-revision and Plan approval results before later phase validation, so exact retries replay after phase advancement. Activation uses a per-click `activationAttemptId`; one network retry reuses it, while a new activation after clear creates a new attempt.
+Command receipts store canonical Profile confirmation/preference-revision and Plan approval results before later phase validation, so exact retries replay after phase advancement. Activation uses a per-click `activationAttemptId`; one network retry reuses it, while a new activation after clear creates a new attempt.
 
 ## Runtime V4 review boundary
 
@@ -123,4 +128,4 @@ Onboarding uses one persisted interview topic at a time. Profile and Plan review
 
 # Product Contract
 
-LearnLoop is learner-first: it stores the learner's raw subject before creating planning structure. Internal classifications never become the first question. DSH native custom input is a supported protocol path. Probes express Host information needs rather than a rigid form. Recommendations and learner evidence have distinct origins and remain reviewable. Runtime V6 tokenizes stateful Tool calls and reserves ordinary Chat for explicit Host fallback. The content runtime generates Host-validated lesson articles through `learnloop_write_lesson_document` and exports them as Markdown, a static HTML site, PDF, EPUB, and a combined ZIP.
+LearnLoop is learner-first: it stores the learner's raw subject before creating planning structure. Internal classifications never become the first question. DSH native custom input is a supported protocol path. Probes express Host information needs rather than a rigid form. Recommendations and learner evidence have distinct origins and remain reviewable. Every Probe's kind, cardinality, and option codes are Host-defined (`docs/PROFILE_INTERVIEW.md`); the model only rewords, relabels codes, records labelled assumptions, or adds bounded follow-ups, and ordinary Chat is reserved for explicit Host fallback. The content runtime generates Host-validated lesson articles through `learnloop_write_lesson_document` and exports them as Markdown, a static HTML site, PDF, EPUB, and a combined ZIP.

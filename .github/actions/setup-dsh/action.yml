@@ -1,5 +1,5 @@
 name: Set up pinned DSH source
-description: 'Check out the verified DeepSeek Harness commit into ./deepseek-harness and build it, so the link: dependency family resolves to one source build.'
+description: 'Check out the verified DeepSeek Harness commit, place it beside LearnLoop at ../deepseek-harness, and build it, so the link: dependency family resolves to one source build.'
 runs:
   using: composite
   steps:
@@ -13,8 +13,12 @@ runs:
         repository: deepseek-ai/deepseek-harness
         ref: ${{ steps.baseline.outputs.commit }}
         path: deepseek-harness
+    # actions/checkout only writes inside the workspace; the link: dependencies expect a sibling.
+    - name: Place the checkout beside LearnLoop
+      shell: bash
+      run: ln -sfn "$GITHUB_WORKSPACE/deepseek-harness" "$GITHUB_WORKSPACE/../deepseek-harness"
     - name: Install and build DSH
       shell: bash
       run: |
-        pnpm --dir deepseek-harness install --frozen-lockfile
-        pnpm --dir deepseek-harness run build
+        pnpm --dir ../deepseek-harness install --frozen-lockfile
+        pnpm --dir ../deepseek-harness run build

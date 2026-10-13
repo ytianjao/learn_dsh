@@ -28,41 +28,41 @@ importers:
         version: 4.4.3
     devDependencies:
       '@deepseek-ai/cordis':
-        specifier: link:./deepseek-harness/vendor/cordis
-        version: link:deepseek-harness/vendor/cordis
+        specifier: link:../deepseek-harness/vendor/cordis
+        version: link:../deepseek-harness/vendor/cordis
       '@deepseek-ai/dsh':
-        specifier: link:./deepseek-harness/apps/cli
-        version: link:deepseek-harness/apps/cli
+        specifier: link:../deepseek-harness/apps/cli
+        version: link:../deepseek-harness/apps/cli
       '@deepseek-ai/dsh-agent':
-        specifier: link:./deepseek-harness/packages/core/agent
-        version: link:deepseek-harness/packages/core/agent
+        specifier: link:../deepseek-harness/packages/core/agent
+        version: link:../deepseek-harness/packages/core/agent
       '@deepseek-ai/dsh-home-paths':
-        specifier: link:./deepseek-harness/packages/util/home-paths
-        version: link:deepseek-harness/packages/util/home-paths
+        specifier: link:../deepseek-harness/packages/util/home-paths
+        version: link:../deepseek-harness/packages/util/home-paths
       '@deepseek-ai/dsh-host-webserver':
-        specifier: link:./deepseek-harness/packages/host/webserver
-        version: link:deepseek-harness/packages/host/webserver
+        specifier: link:../deepseek-harness/packages/host/webserver
+        version: link:../deepseek-harness/packages/host/webserver
       '@deepseek-ai/dsh-llm':
-        specifier: link:./deepseek-harness/packages/llm/llm
-        version: link:deepseek-harness/packages/llm/llm
+        specifier: link:../deepseek-harness/packages/llm/llm
+        version: link:../deepseek-harness/packages/llm/llm
       '@deepseek-ai/dsh-session':
-        specifier: link:./deepseek-harness/packages/core/session
-        version: link:deepseek-harness/packages/core/session
+        specifier: link:../deepseek-harness/packages/core/session
+        version: link:../deepseek-harness/packages/core/session
       '@deepseek-ai/dsh-storage-domain':
-        specifier: link:./deepseek-harness/packages/storage/storage-domain
-        version: link:deepseek-harness/packages/storage/storage-domain
+        specifier: link:../deepseek-harness/packages/storage/storage-domain
+        version: link:../deepseek-harness/packages/storage/storage-domain
       '@deepseek-ai/dsh-system-prompt':
-        specifier: link:./deepseek-harness/packages/core/system-prompt
-        version: link:deepseek-harness/packages/core/system-prompt
+        specifier: link:../deepseek-harness/packages/core/system-prompt
+        version: link:../deepseek-harness/packages/core/system-prompt
       '@deepseek-ai/dsh-tools':
-        specifier: link:./deepseek-harness/packages/core/tools
-        version: link:deepseek-harness/packages/core/tools
+        specifier: link:../deepseek-harness/packages/core/tools
+        version: link:../deepseek-harness/packages/core/tools
       '@deepseek-ai/dsh-user-questions':
-        specifier: link:./deepseek-harness/packages/interaction/user-questions
-        version: link:deepseek-harness/packages/interaction/user-questions
+        specifier: link:../deepseek-harness/packages/interaction/user-questions
+        version: link:../deepseek-harness/packages/interaction/user-questions
       '@deepseek-ai/dsh-workspace':
-        specifier: link:./deepseek-harness/packages/workspace/workspace
-        version: link:deepseek-harness/packages/workspace/workspace
+        specifier: link:../deepseek-harness/packages/workspace/workspace
+        version: link:../deepseek-harness/packages/workspace/workspace
       '@playwright/test':
         specifier: ^1.55.0
         version: 1.63.0
