@@ -4,10 +4,11 @@ LearnLoop (`@learnloop/dsh-learnloop`) is a local-first learning companion shipp
 for DeepSeek Harness (DSH) Web. One npm package holds a Cordis **Host plugin** (`src/` → `lib/`)
 and a dependency-free **Web client** (`client/bundle.js`).
 
-The Harness source is built beside this repo at `../deepseek-harness`. The `@deepseek-ai/*`
-devDependencies link to it for build and tests; at runtime the plugin uses whichever `dsh`
-loads it, which for local work is that same build installed as the global `dsh` (README).
-No DSH package comes from npm.
+The Harness is installed from the npm registry: there is no source checkout on disk. The
+`@deepseek-ai/*` devDependencies are registry ranges, and at runtime the plugin uses whichever
+`dsh` loads it (README). The Host's own module-resolution interception routes a linked plugin's
+bare `@deepseek-ai/*` imports to the launching installation, so plugin and Host share one
+physical module copy — which is why a registry install is safe here.
 
 This file holds the rules that keep a change safe. Feature behavior lives in `docs/`; versions
 live in the files that own them. Do not copy either into this file — copies go stale.
@@ -18,7 +19,7 @@ live in the files that own them. Do not copy either into this file — copies go
 | --- | --- |
 | Persisted shape, domain types, error codes | `src/types.ts` (strict Zod; beats every doc) |
 | Persistence epoch (state schema / Storage Domain / backup format) | `tests/persistence-epoch.spec.ts` pins all three; history in `CHANGELOG.md` |
-| DSH baseline version and commit | `scripts/dsh-baseline.json`; rationale in `docs/DSH_BASELINE.md`, `docs/UPSTREAM_COMPATIBILITY.md` |
+| DSH compatibility (peer ranges vs the installed Harness) | `pnpm run verify:dsh-compat`; rationale in `docs/DSH_BASELINE.md`, `docs/UPSTREAM_COMPATIBILITY.md` |
 | Toolchain pins | `package.json` (`engines`, `packageManager`, `peerDependencies`) |
 | Product rules, activation, verified answers | `docs/PRODUCT_CONTRACT.md` |
 | Profile interview | `docs/PROFILE_INTERVIEW.md` |
@@ -101,8 +102,9 @@ corepack enable && pnpm install --frozen-lockfile
 pnpm run build                # tsdown: src/ → lib/ (never touches client/bundle.js)
 pnpm run lint                 # eslint src tests --max-warnings 0
 pnpm run check                # typecheck + node --check client/bundle.js + vitest; run before a PR
-pnpm run verify:dsh-baseline  # CI gate: peer strings, link targets, checkout drift, lockfile
+pnpm run verify:dsh-compat    # CI gate: peer ranges against the installed Harness, registry-only resolution
 pnpm run e2e:keyless:web      # self-contained browser E2E against a deterministic mock provider
+pnpm run dshweb               # build the plugin and serve it from `dsh web` inside the sbx sandbox (README)
 ```
 
 Focused suites and acceptance scripts are in `package.json` `scripts`; CI jobs are in
@@ -125,11 +127,12 @@ Focused suites and acceptance scripts are in `package.json` `scripts`; CI jobs a
   (`src/domain.ts`), and `BACKUP_FORMAT_VERSION` (`src/http.ts`) together; update
   `tests/persistence-epoch.spec.ts`; record the breaking epoch in `CHANGELOG.md` and on the
   README "Current epoch" line. No migrations.
-- **DSH baseline** → pull `../deepseek-harness` forward and rebuild it
-  (`pnpm --dir ../deepseek-harness install && pnpm --dir ../deepseek-harness run build`); update
-  `scripts/dsh-baseline.json` and the `@deepseek-ai/dsh*` peer strings; `pnpm install`; then
-  build, lint, `check`, `verify:dsh-baseline`, and the real Web acceptance. Keep
-  `docs/DSH_BASELINE.md` and `docs/UPSTREAM_COMPATIBILITY.md` current.
+- **DSH upgrade** → DSH comes from npm; bump the `@deepseek-ai/dsh*` and `@deepseek-ai/cordis`
+  devDependency and peer ranges in `package.json`, then `pnpm install`; run build, lint, `check`,
+  `verify:dsh-compat`, and the real Web acceptance. Keep the ranges floating so an upgrade inside
+  the minor line needs no code change; when the Harness moves to a new major line, adjust our own
+  code to the new seam rather than pinning back. Keep `docs/DSH_BASELINE.md` and
+  `docs/UPSTREAM_COMPATIBILITY.md` current.
 - **New tool** → register it in `src/index.ts`, add its name and phase contract to
   `src/tool-protocol.ts`, and cover its schema and recovery paths with tests.
 - **Interview Probe or option code** → change `INTERVIEW_PROBES` (including its `presence`), the

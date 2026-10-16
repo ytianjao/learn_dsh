@@ -13,7 +13,6 @@ jobs:
     timeout-minutes: 45
     env:
       DSH_TELEMETRY_DISABLED: "1"
-      DSH_BIN: ${{ github.workspace }}/deepseek-harness/apps/cli/lib/bin.js
       LEARNLOOP_INTERVIEW_E2E: "1"
     steps:
       - name: Check out LearnLoop
@@ -26,12 +25,10 @@ jobs:
         with:
           node-version: 22.19.0
           cache: pnpm
-      - name: Check out and build pinned DSH
-        uses: ./.github/actions/setup-dsh
       - name: Print compatibility baseline
         run: |
           echo "LearnLoop commit: $(git rev-parse HEAD)"
-          node -e "const b=require('./scripts/dsh-baseline.json'); console.log('DSH version:',b.version); console.log('DSH commit:',b.commit)"
+          node -e "console.log('DSH version:', require('@deepseek-ai/dsh/package.json').version)"
           echo "Node version: $(node --version)"
           echo "pnpm version: $(pnpm --version)"
       - name: Install LearnLoop

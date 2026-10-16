@@ -2,8 +2,8 @@
 
 ## Current Harness baseline
 
-Runtime maintenance is pinned by `scripts/dsh-baseline.json` to the newest complete published
-npm family (`0.1.1-rc.2`).
+Runtime maintenance follows the DSH npm release at the floating peer range declared in
+`package.json` (see `docs/DSH_BASELINE.md`).
 
 ## Current LearnLoop interaction protocol
 

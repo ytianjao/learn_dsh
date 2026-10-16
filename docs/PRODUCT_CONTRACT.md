@@ -1,7 +1,7 @@
 # 产品契约 / Product contract
 
-> Runtime baseline: all directly consumed Harness packages are pinned to the single
-> `0.2.1-alpha.1` family recorded in `scripts/dsh-baseline.json`. This maintenance upgrade does
+> Runtime baseline: all directly consumed Harness packages come from the npm registry, at the
+> floating `^0.2.1-alpha.1` peer range declared in `package.json`. This maintenance upgrade does
 > not change LearnLoop state schema, product fields, or HTTP API v3.
 
 ## 产品边界 / Product boundary

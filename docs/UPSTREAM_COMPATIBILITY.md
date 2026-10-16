@@ -1,20 +1,21 @@
 # 上游兼容性 / Upstream compatibility
 
-The single machine-readable baseline is `scripts/dsh-baseline.json`. LearnLoop tracks the
-latest Harness at the source checkout beside this repo (`../deepseek-harness`), currently
-version `0.2.1-alpha.1` at verified commit `5badb15009ae1756c3afe0ae0cef1faafc290ccc`.
+DSH is installed from the npm registry — `npx @deepseek-ai/dsh@alpha` runs it and no source
+checkout is kept on disk. The machine-readable statement of compatibility is the peer range in
+`package.json`, checked by `pnpm run verify:dsh-compat` against the installed Harness, currently
+version `0.2.1-alpha.1`.
 
-| LearnLoop | DSH | Commit | Node | pnpm | Cordis | Known limitation |
-| --- | --- | --- | --- | --- | --- | --- |
-| 0.11.0 | 0.2.1-alpha.1 | 5badb15009ae1756c3afe0ae0cef1faafc290ccc | ^22.19.0 or >=24 | 11.7.0 | 4.0.2 | Provenance fails closed when required raw events are absent or ambiguous after external log rewriting. |
+| LearnLoop | DSH peer range | Node | pnpm | Cordis peer | Known limitation |
+| --- | --- | --- | --- | --- | --- |
+| 0.11.0 | ^0.2.1-alpha.1 | ^22.19.0 or >=24 | 11.7.0 | ^4.0.5-alpha.1 | Provenance fails closed when required raw events are absent or ambiguous after external log rewriting. |
 
-当前边界固定为 DSH `0.2.1-alpha.1`（源码检出跟随最新版）。Host 依赖 `storageDomain.open`、domain table `get/put/update` 和 `webServer.register`；Client 依赖 `window.__ModuleLoader__.load` 及 `conversation.view`、`conversation.input.dock`、`settings.section` slots。
+当前边界为 DSH `0.2.1-alpha.1`（npm 发布版，peer 范围浮动）。Host 依赖 `storageDomain.open`、domain table `get/put/update` 和 `webServer.register`；Client 依赖 `window.__ModuleLoader__.load` 及 `conversation.view`、`conversation.input.left`、`sidebar.footer.action`、`settings.section` slots。
 
-The current boundary is pinned to DSH `0.2.1-alpha.1` (tracked at the linked source checkout). The Host depends on `storageDomain.open`, domain-table `get/put/update`, and `webServer.register`; the Client depends on `window.__ModuleLoader__.load` and the `conversation.view`, `conversation.input.dock`, and `settings.section` slots.
+The current boundary is DSH `0.2.1-alpha.1` (npm release, floating peer range). The Host depends on `storageDomain.open`, domain-table `get/put/update`, and `webServer.register`; the Client depends on `window.__ModuleLoader__.load` and the `conversation.view`, `conversation.input.left`, `sidebar.footer.action`, and `settings.section` slots.
 
-升级时运行 `npm run test:compat && npm run build && npm test`，随后对已安装 profile 执行中英文切换、重启持久化和变更冲突 smoke。若任何 seam 变化，先更新适配器与本文档，再改变 peer pin。
+升级时运行 `pnpm run verify:dsh-compat && pnpm run build && pnpm test`，随后对已安装 profile 执行中英文切换、重启持久化和变更冲突 smoke。若任何 seam 变化，先更新适配器与本文档，再改变 peer 范围。
 
-On upgrade, run `npm run test:compat && npm run build && npm test`, then smoke-test Chinese/English switching, restart persistence, and mutation conflicts in an installed profile. If any seam changes, update the adapter and this document before changing peer pins.
+On upgrade, run `pnpm run verify:dsh-compat && pnpm run build && pnpm test`, then smoke-test Chinese/English switching, restart persistence, and mutation conflicts in an installed profile. If any seam changes, update the adapter and this document before changing peer ranges.
 
 ## LearnLoop Runtime V2 contract
 

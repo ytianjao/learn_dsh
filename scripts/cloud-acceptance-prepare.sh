@@ -15,9 +15,9 @@ run_dsh() {
 }
 
 cd "$REPO_ROOT"
-node -e "const b=require('./scripts/dsh-baseline.json'); console.log('DSH version:',b.version); console.log('DSH commit:',b.commit)"
+node -e "console.log('DSH version:', require('@deepseek-ai/dsh/package.json').version)"
 printf 'LearnLoop commit: %s\nNode version: %s\npnpm version: %s\n' "$(git rev-parse HEAD)" "$(node --version)" "$(pnpm --version)"
-pnpm run verify:dsh-baseline
+pnpm run verify:dsh-compat
 printf 'Using isolated DSH_HOME: %s\n' "$DSH_HOME"
 rm -rf -- "$LEARNLOOP_E2E_WORKSPACE"
 mkdir -p "$LEARNLOOP_E2E_WORKSPACE"
