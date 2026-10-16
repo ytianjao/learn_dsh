@@ -183,7 +183,7 @@ and LearnLoop shows **清除旧数据 / Clear old data**; that button moves the 
 
 每次持久化形状变更都会同时提升状态 schema、Storage Domain 版本与备份格式，并构成一次**彻底断层**。**不提供迁移、兼容别名或旧数据导入**——旧状态会被拒绝而不是转换。LearnLoop 不会自行重置或删除 DSH 数据。当已存数据来自另一个 epoch 时，`dsh web` 仍能启动，LearnLoop 会显示 **清除旧数据 / Clear old data**；点击后旧的 `storages/learnloop.json` 会被移到 `DSH_HOME` 下的 `learnloop/stale-backups/`，并重新开始。
 
-Current epoch: **state schema 19, Storage Domain 16, backup format 13**（见 `CHANGELOG.md`）。
+Current epoch: **state schema 20, Storage Domain 17, backup format 14**（见 `CHANGELOG.md`）。
 
 To reset by hand instead, pick one / 也可手动重置，二选一：
 

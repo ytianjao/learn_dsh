@@ -1,5 +1,6 @@
 /** Concept-level mastery: the evidence ladder and the per-concept rows derived from a plan. */
 import type {Evidence, Mastery, PlanVersion, LearningProject} from '../types.js'
+import {nextReviewIso} from '../review-policy.js'
 
 /**
  * The Host-owned mastery ladder. A concept advances by accumulating verified evidence:
@@ -36,7 +37,8 @@ export function advanceMastery(mastery:readonly Mastery[],evidence:Evidence,feed
   // Every evidence item this build records is assessment-kind, so the ladder's
   // "including an assessment" condition is satisfied by the count itself.
   const assessmentBacked=evidence.kind==='assessment'?evidenceIds.length:0
-  return{...row,level:masteryLevelFor(evidenceIds,assessmentBacked),evidenceIds,rationale:feedback,lastPracticedAt:at,updatedAt:at}
+  // Schedule the next review using the Host-owned spaced-review policy.
+  return{...row,level:masteryLevelFor(evidenceIds,assessmentBacked),evidenceIds,rationale:feedback,lastPracticedAt:at,nextReviewAt:nextReviewIso(evidenceIds.length-1,at),updatedAt:at}
  })
 }
 
