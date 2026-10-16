@@ -97,15 +97,21 @@ Only what file names do not tell you:
 
 ## Commands
 
+These run **inside the sbx sandbox**, where the dependencies live; the host keeps no
+`node_modules` (see README "Sandbox (sbx)"). `CI=true` is required — without it pnpm aborts the
+modules-dir purge for want of a TTY.
+
 ```bash
-corepack enable && pnpm install --frozen-lockfile
+pnpm run sandbox:setup        # one-time, idempotent: sandbox packages, browser, sandbox-local node_modules, install
 pnpm run build                # tsdown: src/ → lib/ (never touches client/bundle.js)
 pnpm run lint                 # eslint src tests --max-warnings 0
 pnpm run check                # typecheck + node --check client/bundle.js + vitest; run before a PR
 pnpm run verify:dsh-compat    # CI gate: peer ranges against the installed Harness, registry-only resolution
 pnpm run e2e:keyless:web      # self-contained browser E2E against a deterministic mock provider
-pnpm run dshweb               # build the plugin and serve it from `dsh web` inside the sbx sandbox (README)
+pnpm run dshweb               # build the plugin in the sandbox and serve it from `dsh web` (README)
 ```
+
+From the host, wrap one in `sbx exec my-sandbox bash -lc 'cd /d/code/learn_dsh && CI=true <command>'`.
 
 Focused suites and acceptance scripts are in `package.json` `scripts`; CI jobs are in
 `.github/workflows/`.

@@ -41,37 +41,109 @@ Keep it on npm / 只用 npm 发布版：
 
 ## Verify
 
+These run **inside the sandbox**; the host has no `node_modules` (see "Sandbox (sbx)").
+`scripts/sandbox-setup.mjs` prepared it, and `sbx exec … CI=true` is the shape every command
+takes. / 以下命令都在**沙箱内**运行，宿主机没有 `node_modules`（见“沙箱（sbx）”）。沙箱由
+`scripts/sandbox-setup.mjs` 准备好，所有命令统一采用 `sbx exec … CI=true` 的形式。
+
 ```bash
-pnpm run check                # typecheck + client syntax + all tests
-pnpm run lint
-pnpm run verify:dsh-compat    # peer ranges vs the installed Harness, and registry-only resolution
-pnpm run e2e:keyless:web      # full browser flow against a deterministic mock provider
-MOCK_MODEL_POLICY=null pnpm run e2e:keyless:web   # the same flow with a "null model" that sends only the question token
+S="sbx exec my-sandbox bash -lc"; R="cd /d/code/learn_dsh"
+$S "$R && CI=true pnpm run check"                # typecheck + client syntax + all tests
+$S "$R && CI=true pnpm run lint"
+$S "$R && CI=true pnpm run verify:dsh-compat"    # peer ranges vs the installed Harness, and registry-only resolution
+$S "$R && CI=true pnpm run e2e:keyless:web"      # full browser flow against a deterministic mock provider
+$S "$R && MOCK_MODEL_POLICY=null CI=true pnpm run e2e:keyless:web"   # the same flow with a "null model" that sends only the question token
 ```
 
 ## After editing / 修改后更新
 
-- `src/**`: `pnpm run build`, then restart `dsh web` — the profile links the plugin in place, so there is nothing to reinstall or re-register. / 改源码后重新构建并重启服务即可，链接都是活路径，无需重装或重新注册。
+This repo keeps **no `node_modules` on the host** — only inside the sandbox (see "Sandbox (sbx)"
+below). `pnpm run` therefore does not work from the repo root on the machine you edit on; run the
+build and the tests through `dshweb` or `sbx exec`.
+/ 本仓库在宿主机上**不保留 `node_modules`**，依赖只存在于沙箱中（见下面的“沙箱（sbx）”）。因此在
+编辑所在的机器上，仓库根目录里的 `pnpm run` 并不可用；构建与测试请通过 `dshweb` 或 `sbx exec` 执行。
+
+- `src/**`: `pnpm run dshweb` — it rebuilds the plugin inside the sandbox against the sandbox's
+  install and restarts `dsh web`. The profile links the plugin in place, so there is nothing to
+  reinstall or re-register. / 改源码后执行 `pnpm run dshweb`：它在沙箱内用沙箱自己的依赖重新构建插件
+  并重启 `dsh web`；链接都是活路径，无需重装或重新注册。
 - `client/bundle.js`: reload the browser page. / 改客户端 bundle 后刷新页面。
-- Dependency changes: `pnpm install`. / 依赖变更后重新 install。
-- Upgrading DSH: `npx -y @deepseek-ai/dsh@alpha ...` picks up the newest alpha on its own. After a Harness upgrade, run `pnpm install` (to move the devDependencies) and `pnpm run verify:dsh-compat`; if it reports an incompatible peer, widen or adjust the range in `package.json` and fix our own code, per "When you change things" in `AGENTS.md`. / 升级 DSH：`npx -y @deepseek-ai/dsh@alpha ...` 会自动使用最新的 alpha。升级后执行 `pnpm install`（同步开发依赖）与 `pnpm run verify:dsh-compat`；若报 peer 不兼容，按 `AGENTS.md` 的“When you change things”调整 `package.json` 的范围并修改我们自己的代码。
+- Dependency changes: `pnpm run sandbox:setup --force-reinstall`, or `CI=true pnpm install`
+  inside the sandbox. / 依赖变更后：`pnpm run sandbox:setup --force-reinstall`，或到沙箱内执行
+  `CI=true pnpm install`。
+- Tests: `sbx exec my-sandbox bash -lc 'cd /d/code/learn_dsh && CI=true pnpm run check'`.
+  / 测试：在沙箱内执行上述 `check`。
+- Upgrading DSH: `npx -y @deepseek-ai/dsh@alpha ...` picks up the newest alpha on its own. After a Harness upgrade, run `pnpm run sandbox:setup --force-reinstall` (to move the devDependencies) and `pnpm run verify:dsh-compat`; if it reports an incompatible peer, widen or adjust the range in `package.json` and fix our own code, per "When you change things" in `AGENTS.md`. / 升级 DSH：`npx -y @deepseek-ai/dsh@alpha ...` 会自动使用最新的 alpha。升级后在沙箱内重新 install（同步开发依赖）并执行 `pnpm run verify:dsh-compat`；若报 peer 不兼容，按 `AGENTS.md` 的“When you change things”调整 `package.json` 的范围并修改我们自己的代码。
 
 ## Sandbox (sbx) / 沙箱（sbx）
 
-`sbx` runs the Harness on the sandbox's own npm install while the plugin stays bind-mounted
-from this repo, so a host rebuild is what the sandbox serves. `scripts/dshweb.mjs` wires that
-up: it builds the plugin, starts (or restarts) `dsh web` inside the sandbox, and prints a
-loopback URL for the browser. / `sbx` 让 Harness 跑在沙箱自己的 npm 安装上，而插件仍从本仓库
-bind-mount 进去，因此宿主机的一次构建就是沙箱所服务的内容。`scripts/dshweb.mjs` 把这一步
-串起来：构建插件、在沙箱内启动（或重启）`dsh web`，并打印可直接在宿主机浏览器打开的
-回环地址。
+The sandbox owns the whole loop: it has its own npm install of the Harness, its own copy of this
+repo's dependencies, and the plugin stays bind-mounted from this repo. `scripts/dshweb.mjs` wires
+that up — it installs if needed, builds the plugin **inside the sandbox**, starts (or restarts)
+`dsh web`, and prints a URL for the host browser. / 整套流程都在沙箱内完成：Harness 用它自己的
+npm 安装，本仓库的依赖也由沙箱自己装，插件则从本仓库 bind-mount 进去。`scripts/dshweb.mjs` 把
+这一步串起来：按需安装、在**沙箱内**构建插件、启动（或重启）`dsh web`，并打印可在宿主机浏览器
+打开的地址。
 
 ```bash
-pnpm run dshweb          # build the plugin, restart DSH Web, print the URL / 构建并重启，打印地址
+pnpm run dshweb          # install if needed, build, restart DSH Web, print the URL / 按需安装、构建、重启并打印地址
 pnpm run dshweb stop     # stop it / 停止
 ```
 
+`pnpm run dshweb` and `pnpm run sandbox:setup` are the only two commands meant to run on the host.
+They reach the sandbox through `sbx`, so they work from a checkout with no `node_modules` at all.
+/ 只有 `pnpm run dshweb` 与 `pnpm run sandbox:setup` 这两个命令是在宿主机上执行的；它们通过 `sbx`
+进入沙箱，因此在完全没有 `node_modules` 的检出上也能运行。
+
 One-time sandbox setup / 沙箱一次性准备：
+
+```bash
+pnpm run sandbox:setup     # idempotent; safe to re-run after a sandbox restart
+```
+
+Development and testing happen **inside** the sandbox. `sandbox:setup` makes a fresh one
+capable of it, because two properties of the mount break a plain checkout:
+
+- **The repo is bind-mounted from Windows over virtiofs, which has no symlinks.** pnpm's
+  isolated `node_modules` is a tree of them, so `pnpm install` fails with `EPERM` on the mount.
+  The script binds a sandbox-local directory (on the sandbox's own overlayfs) over
+  `node_modules`, which fixes it. The mount lasts for the life of the container, not a restart.
+  / 仓库从 Windows 经 virtiofs 挂载，**不支持符号链接**；pnpm 的隔离式 `node_modules` 全是符号
+  链接，`pnpm install` 会在挂载点上报 `EPERM`。脚本把一个沙箱本地目录（在沙箱自己的
+  overlayfs 上）bind-mount 到 `node_modules` 上解决；该挂载只在容器存活期间有效，重启后需重跑。
+- **The host's `node_modules` is visible in the sandbox but is a Windows install.** Its native
+  binaries (`rollup`, `koffi`, `node-pty`) are `.node` files for the wrong OS, so `vitest` dies
+  with `MODULE_NOT_FOUND`. The sandbox needs its own install; never copy the host's in.
+  / 宿主机的 `node_modules` 在沙箱里可见，但那是 Windows 版安装；其中的原生二进制（`rollup`、
+  `koffi`、`node-pty`）是为另一个系统编译的 `.node`，`vitest` 会以 `MODULE_NOT_FOUND` 失败。
+  沙箱必须自己装一份，不要把宿主机的复制进去。
+
+The script also installs a Playwright browser (the keyless E2E needs a real one), the CJK fonts
+the PDF/EPUB export assertions render with, and `tmux`/`tree`/`zip`/`fd`.
+/ 脚本还会装 Playwright 浏览器（无密钥 E2E 需要真实浏览器）、PDF/EPUB 导出断言所需的 CJK 字体，
+以及 `tmux`/`tree`/`zip`/`fd`。
+
+Run commands in the sandbox with `CI=true`: without it pnpm aborts the modules-dir purge for
+want of a TTY. Use the **guest** address for anything that talks to the server from inside the
+sandbox — the host-published `127.0.0.1:3080` is not reachable there.
+/ 在沙箱里执行命令要带 `CI=true`：否则 pnpm 因无 TTY 而中止删除 modules 目录。在沙箱内部访问
+服务要用**沙箱自己的**地址，宿主机发布的 `127.0.0.1:3080` 在沙箱内不可达。
+
+The guest address (`172.17.0.1`) is **not** in the sandbox's `no_proxy`, which lists only
+`localhost`, `127.0.0.1`, `::1`, and `gateway.docker.internal`. A request there is therefore sent
+to the sandbox's own proxy, which answers `500 EOF` — easy to mistake for a DSH fault. Add the
+guest address to `no_proxy` when driving the server from inside the sandbox:
+
+```bash
+export no_proxy="localhost,127.0.0.1,::1,gateway.docker.internal,172.17.0.1"
+# then, e.g. against the instance dshweb started:
+DSH_WEB_URL="http://172.17.0.1:3080/?$(grep -oE 'token=[A-Za-z0-9_-]+' /tmp/dshweb.log | tail -1)" \
+  CI=true npx playwright test          # `pnpm run test:e2e` half: Playwright vs a running DSH Web
+```
+
+/ 沙箱的 `no_proxy` 只列了 `localhost`、`127.0.0.1`、`::1` 和 `gateway.docker.internal`，**不含**
+来宾地址 `172.17.0.1`；因此发往它的请求会走沙箱自己的代理，返回 `500 EOF`，很容易误判成 DSH 的
+故障。在沙箱内驱动服务时，把来宾地址加进 `no_proxy` 即可。
 
 - The sandbox needs its own `dsh`, installed flat (`nodeLinker: hoisted`) so the platform
   native addon links as a sibling of the package that loads it — a pnpm-global install leaves

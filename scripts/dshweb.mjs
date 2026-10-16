@@ -3,8 +3,10 @@
  *
  * Two halves make the latest code run:
  *   - the sandbox's `dsh` comes from npm (nothing on the host provides it),
- *   - the plugin is bind-mounted from this host, so `pnpm run build` here is what
- *     the sandbox loads. Building first is the whole point of this command.
+ *   - the plugin is bind-mounted from this repo, and the build that DSH loads is made
+ *     *inside* the sandbox. The host keeps no `node_modules` of its own: the repo mount
+ *     is virtiofs, which cannot hold pnpm's symlinks, so `scripts/sandbox.mjs` binds a
+ *     sandbox-local install over `node_modules` and this script builds against it.
  *
  * The sandbox listens on its own eth0; only the published port is bound on the host,
  * and only on loopback.
@@ -13,10 +15,9 @@
  *   (default)  rebuild the plugin, restart DSH Web, print the token URL
  *   stop       stop the running DSH Web and exit
  */
-import {execFileSync, execSync} from 'node:child_process'
+import {execFileSync} from 'node:child_process'
+import {GUEST_REPO, SANDBOX, assertReachable, ensureNodeModules, hasInstall, inside, insideVisible, installDependencies, probe, say, sleep} from './sandbox.mjs'
 
-const SANDBOX = process.env.DSHWEB_SANDBOX ?? 'my-sandbox'
-const REPO = process.env.DSHWEB_REPO ?? 'D:/code/learn_dsh'
 const WORKDIR = process.env.DSHWEB_WORKDIR ?? '/d/code/learn'
 const DSH = process.env.DSHWEB_DSH ?? '/home/agent/dsh-runtime/node_modules/@deepseek-ai/dsh/lib/bin.js'
 const HOST_PORT = Number(process.env.DSHWEB_PORT ?? 3080)
@@ -26,16 +27,11 @@ const LOG = process.env.DSHWEB_LOG ?? '/tmp/dshweb.log'
 // list of this very command line shows `[d]sh/...`, which the regex does not match.
 const WEB_MATCH = '[d]sh/lib/bin.js web'
 
-const say = text => process.stderr.write(`dshweb: ${text}\n`)
-const sleep = ms => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms)
-
 /** Run to completion and return trimmed stdout; a nonzero exit throws. */
 const run = (file, args, options = {}) =>
   execFileSync(file, args, {encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], ...options}).trim()
 
 const sbx = (...args) => run('sbx', args)
-/** Run a shell snippet inside the sandbox. */
-const inside = script => sbx('exec', SANDBOX, 'bash', '-lc', script)
 const quoted = text => JSON.stringify(text)
 const isRunning = () => inside(`pgrep -f ${quoted(WEB_MATCH)} >/dev/null && echo yes || echo no`) === 'yes'
 
@@ -44,19 +40,26 @@ function stop() {
   inside(`pkill -f ${quoted(WEB_MATCH)} || true`)
 }
 
+/** Build the plugin in the sandbox, where the install supports symlinks and runs on Linux. */
+function build() {
+  ensureNodeModules()
+  if (!hasInstall()) installDependencies()
+  say(`building the plugin in ${SANDBOX}:${GUEST_REPO}`)
+  insideVisible(`cd ${GUEST_REPO} && CI=true pnpm run build`)
+}
+
 function main() {
   if (process.argv.slice(2).some(arg => !arg.startsWith('-')) && process.argv[2] === 'stop') {
+    assertReachable()
     stop()
     say('stopped')
     return
   }
 
-  say(`building the plugin in ${REPO}`)
-  // Windows needs the shell to resolve pnpm.cmd; quote the path so no argument is concatenated raw.
-  execSync(process.platform === 'win32' ? `pnpm run build` : 'pnpm run build', {cwd: REPO, stdio: ['ignore', 'pipe', 'inherit'], shell: process.platform === 'win32'})
-
   say(`bringing sandbox ${SANDBOX} up`)
-  inside('true')
+  assertReachable()
+
+  build()
 
   // Re-publishing an existing mapping is a conflict, not a failure.
   try {
@@ -74,14 +77,14 @@ function main() {
     sleep(1500)
   }
 
-  const guest = inside(`node -e "const os=require('os');for(const a of Object.values(os.networkInterfaces()).flat())if(a.family==='IPv4'&&!a.internal){console.log(a.address);break}"`)
+  const guest = probe(`node -e "const os=require('os');for(const a of Object.values(os.networkInterfaces()).flat())if(a.family==='IPv4'&&!a.internal){console.log(a.address);break}"`)
   if (!guest) throw new Error('the sandbox has no external IPv4 interface to bind')
   say(`serving on ${guest}:${GUEST_PORT} inside the sandbox`)
   // A bare `sbx exec` tears down its process tree when it returns, so the server is
   // detached with setsid and reparents to the sandbox's init.
   inside(`mkdir -p ${WORKDIR}; cd ${WORKDIR}; : > ${LOG}; `
     + `setsid nohup node ${DSH} web --host ${guest} --port ${GUEST_PORT} --no-open `
-    + `--trusted-host 127.0.0.1:${HOST_PORT} >${LOG} 2>&1 </dev/null & echo launched`)
+    + `--trusted-host 127.0.0.1:${HOST_PORT} --trusted-host ${guest}:${GUEST_PORT} >${LOG} 2>&1 </dev/null & echo launched`)
 
   // The token is minted at startup; wait for the line that carries it.
   let token

@@ -15,7 +15,10 @@ each feature. **Do not restate it here** — this file only adds the operational
 ## Commands
 
 The forms `AGENTS.md` and `package.json` do not show, which are what you actually reach for
-while iterating:
+while iterating. Every one of them runs **inside the sbx sandbox**, because that is where the
+dependencies are — the host keeps no `node_modules`. Prefix them at the host with
+`sbx exec my-sandbox bash -lc 'cd /d/code/learn_dsh && CI=true …'`, or `cd` there first if you
+are already inside the sandbox:
 
 ```bash
 pnpm vitest run tests/domain.spec.ts          # one spec file
