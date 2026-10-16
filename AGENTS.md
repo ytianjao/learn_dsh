@@ -62,8 +62,12 @@ Breaking one of these is a design change, not a refactor.
   `src/content/privacy.ts`; the model's own redaction is not trusted. Lesson source snapshots
   are bounded — never raw transcripts, learner answers, system prompts, tool payloads,
   credentials, or local paths.
-- **Strict Zod at every boundary.** `tsconfig.json` is `strict: false`; type safety comes from
-  `.strict()` Zod schemas at runtime. Do not loosen them; parse, don't cast.
+- **Strict Zod at every boundary, and strict TypeScript inside it.** `tsconfig.json` has
+  `strict: true` with `skipLibCheck: false`, and `eslint.config.js` applies type-aware rules to
+  `src/` (floating promises, promise-misuse, switch exhaustiveness). Zod guards data entering the
+  system; TypeScript guards the composition inside it. Neither replaces the other: keep both, do
+  not loosen a `.strict()` schema, and do not reach for `as any` or `ts-nocheck` to quiet a
+  diagnostic — narrow, or parse. `tests/static-guards.spec.ts` proves each check still fires.
 - **Persistence epochs are clean breaks.** Older states and backups are rejected. There is no
   migration, compatibility alias, or automatic reset or deletion. A stale stored state must not
   stop `dsh web`: `src/storage-recovery.ts` starts LearnLoop degraded, and only the learner's

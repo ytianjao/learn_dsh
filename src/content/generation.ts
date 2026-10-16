@@ -2,13 +2,12 @@ import {randomUUID} from 'node:crypto'
 import {LearnLoopDomainError} from '../domain.js'
 import {toolAllowed} from '../tool-protocol.js'
 import type {LearnLoopState,LearningProject,LearningTask} from '../types.js'
-import {applyWorkspaceCommand,activeProject,commandReceiptFor,commandResultFor,workspaceForSession,workspaceOf} from '../workspace.js'
+import {applyWorkspaceCommand,activeProject,commandReceiptFor,commandResultFor,fail,workspaceForSession,workspaceOf} from '../workspace.js'
 import {acceptedAssessmentForTask,lessonCaptureForTask,tasksOfPlan} from './capture.js'
 import type {CaptureRequest,ExportRecord,GenerationJob,LessonDocument} from './schemas.js'
 
 const now=()=>new Date().toISOString()
 const uid=(prefix:string)=>`${prefix}_${randomUUID()}`
-const fail=(code:ConstructorParameters<typeof LearnLoopDomainError>[0],message:string):never=>{throw new LearnLoopDomainError(code,message)}
 
 export const activeGenerationJob=(project:LearningProject)=>project.content.generationJobs.find(job=>job.id===project.content.activeGenerationJobId)??null
 

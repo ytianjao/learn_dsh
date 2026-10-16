@@ -7,7 +7,8 @@ import {interviewTopics, learnLoopStateSchema, type Assessment, type CriterionAs
 import {applyWorkspaceCommand} from './bus.js'
 import {createProfileInterview} from './interview.js'
 export const now=()=>new Date().toISOString(); export const uid=(p:string)=>`${p}_${randomUUID()}`
-export const fail=(code:ConstructorParameters<typeof LearnLoopDomainError>[0],message:string):never=>{throw new LearnLoopDomainError(code,message)}
+// A declaration, not a const arrow: control flow narrows after `if(!x)fail(...)` only when the callee carries an explicit type.
+export function fail(code:ConstructorParameters<typeof LearnLoopDomainError>[0],message:string):never{throw new LearnLoopDomainError(code,message)}
 export function requireToolPhase(project:LearningProject,toolName:LearnLoopToolName){if(!toolAllowed(toolName,project,'executable'))throw new LearnLoopDomainError('INVALID_PROJECT_PHASE','This tool is not allowed in the current LearnLoop phase.',{currentPhase:project.execution?.phase??project.phase,allowedPhases:executablePhasesForTool(toolName),toolName})}
 
 export function emptyWorkspace(workspaceId:string):WorkspaceLearningState{return{workspaceId,revision:0,activeProjectId:null,projects:{},activeSessionId:null,events:[]}}

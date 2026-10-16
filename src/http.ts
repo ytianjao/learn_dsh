@@ -109,7 +109,7 @@ export function createLearnLoopHttpHandler(table:StateTable,sessions?:SessionRea
    const receipt=articleGenerationReceipt(updated,identity.workspaceId,parsed.idempotencyKey)
    if(receipt?.started){
     let project=activeProject(updated.workspaces[identity.workspaceId]!),job=project.content.generationJobs.find(item=>item.id===receipt.jobId)
-    const capture=job?.currentTaskId?project.content.captureRequests.filter(item=>item.taskId===job.currentTaskId&&item.status==='pending').at(-1):undefined
+    const currentTaskId=job?.currentTaskId,capture=currentTaskId?project.content.captureRequests.filter(item=>item.taskId===currentTaskId&&item.status==='pending').at(-1):undefined
     if(capture)await runLessonCapture(table,content.sessions,content.repositoryFor(identity.workspaceId,project.id),{workspaceId:identity.workspaceId,projectId:project.id,sessionId:identity.sessionId,captureId:capture.id,idempotencyKey:`capture:${capture.id}:${capture.attempt}`})
     updated=table.get('singleton')??updated
     project=activeProject(updated.workspaces[identity.workspaceId]!)
