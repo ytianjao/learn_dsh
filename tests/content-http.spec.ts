@@ -12,7 +12,7 @@ import {createLearnLoopWriteLessonDocumentTool} from '../src/content/tool.js'
 interface Reply{status:number;body:string;headers:Record<string,string>}
 async function call(handler:(req:never,res:never)=>Promise<void>,method:string,url:string,payload?:unknown):Promise<Reply>{
  const req=new PassThrough() as never,result:Reply={status:0,body:'',headers:{}}
- Object.assign(req as object,{method,url})
+ Object.assign(req as object,{method,url,headers:method==='POST'?{'content-type':'application/json','x-learnloop-mutation':'learnloop-v3'}:{}})
  const res={writeHead(status:number,headers:Record<string,string>){result.status=status;result.headers=headers},end(body?:string|Buffer){if(body!==undefined)result.body=typeof body==='string'?body:Buffer.from(body).toString('binary')},write(chunk:Uint8Array){result.body+=Buffer.from(chunk).toString('binary');return true},on(){},once(){},emit(){}} as never
  if(payload!==undefined)(req as PassThrough).end(JSON.stringify(payload));else (req as PassThrough).end()
  await handler(req,res)

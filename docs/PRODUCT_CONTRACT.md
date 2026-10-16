@@ -42,9 +42,9 @@ When a task is completed with evidence from the current-task interface, Evidence
 
 ## 隐私与安全 / Privacy and security
 
-LearnLoop 不接收模型密钥。变更接口要求同源、JSON content type、专用 mutation header、严格运行时 schema 和 128 KiB 请求上限。导出包含学习数据，用户应按敏感数据保护。
+LearnLoop 不接收模型密钥。变更接口在读取 body **之前**校验 JSON content type 与专用 mutation header（`x-learnloop-mutation: learnloop-v3`），并按字节流限制 128 KiB；超限立即停止累计并返回 413，不产生任何 mutation。读取路径按 Workspace 授权，跨源请求被拒绝。这些是 local-first 隔离措施，**不是**多用户身份认证。DSH 的 web server 只负责路由注册与静态服务，不提供 CSRF 校验、body 上限或 413，因此上述边界由 LearnLoop 自己承担。导出包含学习数据，用户应按敏感数据保护。
 
-LearnLoop never receives model credentials. The mutation API requires same origin, JSON content type, a dedicated mutation header, strict runtime schemas, and a 128 KiB request limit. Exports contain learning data and should be protected as sensitive information.
+LearnLoop never receives model credentials. The mutation API validates the JSON content type and a dedicated mutation header (`x-learnloop-mutation: learnloop-v3`) **before reading the body**, and enforces a 128 KiB limit on the byte stream; an over-limit request stops accumulating at once and returns 413 without performing any mutation. Read paths are Workspace-scoped and cross-origin requests are refused. These are local-first isolation measures, **not** multi-user authentication. DSH's web server registers routes and serves assets but provides no CSRF check, body ceiling, or 413, so LearnLoop owns these guards itself. Exports contain learning data and should be protected as sensitive information.
 
 
 ## DSH Chat generated plans (PR #13)
@@ -71,11 +71,11 @@ DSH owns session, Chat, model routing, streaming, credentials, and the tool exec
 
 ## Runtime hardening (PR #20)
 
-A LearnLoop Workspace may attach its active Project to the current DSH Session for execution. The Host returns a server-redacted projection to foreign sessions and rejects their project mutations; this local product-state isolation prevents accidental cross-session access, but is not multi-user or multi-tenant authentication. Same-origin remains the HTTP write boundary and LearnLoop never receives model credentials.
+A LearnLoop Workspace may attach its active Project to the current DSH Session for execution. Session identity is resolved through the DSH Workspace registry: a mutation whose Session is not attached to the Workspace it claims is rejected (`WORKSPACE_MISMATCH`), and a Session attached to no Workspace is rejected (`WORKSPACE_NOT_FOUND`). This local product-state isolation prevents accidental cross-session access, but is not multi-user or multi-tenant authentication. The HTTP write boundary is the mutation header and Origin check described under Privacy and security; LearnLoop never receives model credentials.
 
 Task status changes are available only through semantic commands: start, pause, resume, skip, safe restore, and atomic completion with evidence. A blocked task remains the current learning position; only completed or skipped dependencies are satisfied, and skipping never means mastery. Completing a task does not auto-start its successor.
 
-Invariants: `project.sessionId === mutation.sessionId`; active and blocked current tasks cannot coexist; `foreign => no project, plan, evidence, mastery, assessment, or event content`.
+Invariants: a mutation's canonical Workspace and Session come from the DSH registry, not from the client's claim; active and blocked current tasks cannot coexist.
 
 ## Verified answer invariants
 - **Candidate provenance:** every `candidate.source.messageIds` identifies a real DSH `user/message` in `project.sessionId`.
@@ -83,7 +83,7 @@ Invariants: `project.sessionId === mutation.sessionId`; active and blocked curre
 - **Completion:** `task.status === completed` implies a verified assessment result of `passed` or `excellent`.
 - **Visibility:** the answer appears as an ordinary Chat user message; verifier policy appears only in System Prompt/trajectory.
 - **Mastery:** one passed answer produces `practicing` and never `mastered`; a concept reaches `mastered` only by accumulating three verified evidence items including a formal assessment, which for a shared concept means more than one Task.
-- **Backup:** only the owner Session can export a complete project backup.
+- **Backup:** a Workspace export is answered over the local HTTP boundary and contains that Workspace's learning data; it is not an owner-session-only operation.
 
 Verified Answer Loop v1 accepts text only. It does not automatically verify images or artifacts, or rewrite arbitrary model prose. Mastery is evidence-count based rather than time-decayed: `nextReviewAt` is recorded but no spaced-review scheduler consumes it yet. Model judgment can still be wrong; the host nevertheless enforces provenance, complete criterion coverage, and state boundaries.
 
