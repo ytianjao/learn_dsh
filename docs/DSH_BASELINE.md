@@ -1,14 +1,20 @@
 # DSH 基线 / DSH baseline
 
-## 固定版本 / Pinned version
+## 分发方式 / Distribution
 
-- DSH release / DSH 版本：`0.2.1-alpha.1`（源码检出跟随最新版 / tracked at the linked source checkout）
-- Baseline commit / 基线提交：`5badb15009ae1756c3afe0ae0cef1faafc290ccc`
+- DSH 来源 / DSH source：**npm 发布版**（`npx @deepseek-ai/dsh@alpha`），硬盘上不保留源码检出
+- peer 范围 / Peer ranges：`package.json` 的 `@deepseek-ai/dsh-*` 与 `@deepseek-ai/cordis`
 - Node：`^22.19.0 || >=24`
 
 LearnLoop 只依赖公开 Host seams：Cordis Context、Storage Domain 与 Host Web Server；Client 通过 DSH Web slots 注册视图、输入 dock 和设置。
 
 LearnLoop depends only on public Host seams: Cordis Context, Storage Domain, and Host Web Server. The Client registers views, an input dock, and settings through DSH Web slots.
+
+## 版本跟随 / Version tracking
+
+peer 范围使用浮动区间（`^0.2.1-alpha.1`），因此在同一小版本线内升级 DSH 不需要改代码。Host 的 profile preflight 用 `evaluatePluginCompatibility` 校验插件声明的 peer；范围不匹配会让插件在启动时被禁用，也会让 `dsh plugin add` 拒绝安装。`pnpm run verify:dsh-compat` 直接调用同一个函数，因此冲突会在 CI 先暴露。
+
+Peer ranges float (`^0.2.1-alpha.1`), so a Harness upgrade inside the minor line needs no code change. The Host's profile preflight validates declared peers with `evaluatePluginCompatibility`; a mismatched range disables the plugin at startup and makes `dsh plugin add` refuse the install. `pnpm run verify:dsh-compat` calls that same function, so a conflict surfaces in CI first.
 
 ## 所有权 / Ownership
 
@@ -18,6 +24,6 @@ DSH owns sessions, messages, model configuration, credentials, and streaming res
 
 ## 升级规则 / Upgrade rule
 
-更改 DSH 基线前，必须重新运行构建、兼容性测试、HTTP/领域测试和真实 Web fixture 验收。Client Module 格式仍为 prerelease 风险边界。
+更改 peer 范围前，必须重新运行构建、兼容性测试、HTTP/领域测试和真实 Web fixture 验收。跨大版本线时修改我们自己的代码去适配新 seam，而不是把版本钉回去。Client Module 格式仍为 prerelease 风险边界。
 
-Before changing the DSH baseline, rerun build, compatibility, HTTP/domain tests, and acceptance against a real Web fixture. The Client Module format remains a prerelease risk boundary.
+Before changing a peer range, rerun build, compatibility, HTTP/domain tests, and acceptance against a real Web fixture. When the Harness crosses a major line, adjust our own code to the new seam rather than pinning back. The Client Module format remains a prerelease risk boundary.

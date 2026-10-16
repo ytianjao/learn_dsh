@@ -1,5 +1,12 @@
 minimumReleaseAge: 0
 
+# The host keeps no node_modules: this repo is developed and tested inside the sbx
+# sandbox, and its mount (virtiofs) cannot hold pnpm's symlinks. pnpm would otherwise
+# auto-install before every `pnpm run`, which recreates a Windows install and fires the
+# `prepare` build on the host. Explicit installs — `pnpm run sandbox:setup`, or
+# `CI=true pnpm install` in the sandbox — remain the only way dependencies arrive.
+verifyDepsBeforeRun: false
+
 allowBuilds:
   '@deepseek-ai/dsh-subprocess-local': true
   '@google/genai': true

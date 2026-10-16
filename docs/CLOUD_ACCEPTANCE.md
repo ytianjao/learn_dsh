@@ -4,16 +4,15 @@
 
 | 项目 / Item | 固定值 / Pin |
 | --- | --- |
-| DeepSeek Harness | `0.2.1-alpha.1`（源码检出 / linked source checkout） |
-| Upstream commit / 上游提交 | `5badb15009ae1756c3afe0ae0cef1faafc290ccc` |
+| DeepSeek Harness | `0.2.1-alpha.1`（npm 发布版 / npm release，`alpha` 频道） |
 | Node | `22.19.0`（DSH 支持 `^22.19.0 || >=24.0.0`） |
 | pnpm | `11.7.0` |
-| Plugin install / 插件安装 | `dsh plugin --profile web add <checkout>` |
+| Plugin install / 插件安装 | `dsh plugin --profile web add <repo>` |
 | Web start / Web 启动 | `dsh web --host 127.0.0.1 --port 3080 --trusted-host <authority> --no-open` |
 
-版本来自同一 DSH release commit 的根 `package.json` 和 CLI package。LearnLoop 将 CLI 固定为精确 dev dependency，并使用同版本 Node/pnpm 构建 Codespace 与 Actions。Web E2E 还会 checkout、构建并实际启动该固定 commit 的 CLI，而不是仅验证一个未使用的源码 checkout。
+DSH 从 npm 安装，硬盘上不保留源码检出。LearnLoop 将 CLI 声明为 dev dependency 并使用同版本 Node/pnpm 构建 Codespace 与 Actions。Web E2E 会实际启动该 npm 安装的 CLI，而不是验证一个未使用的源码检出。
 
-These versions come from the root `package.json` and CLI package at the same DSH release commit. LearnLoop pins the CLI as an exact dev dependency and uses the matching Node/pnpm versions in Codespaces and Actions. Web E2E also checks out, builds, and actually starts the CLI from that pinned commit rather than validating an unused source checkout.
+DSH is installed from npm; no source checkout is kept on disk. LearnLoop declares the CLI as a dev dependency and uses the matching Node/pnpm versions in Codespaces and Actions. Web E2E actually starts that npm-installed CLI rather than validating an unused source checkout.
 
 ## 从 PR 分支创建 Codespace / Create a Codespace from a PR branch
 

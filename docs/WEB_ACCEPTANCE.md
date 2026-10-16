@@ -1,7 +1,7 @@
 # 网页验收 / Web acceptance
 
-The keyless browser lane checks out the immutable Harness commit from
-`scripts/dsh-baseline.json`; it never follows `master` or contacts a real model endpoint.
+The keyless browser lane runs the DSH CLI installed from npm at the range pinned in
+`package.json`; it never follows `master` or contacts a real model endpoint.
 
 ## 自动验收 / Automated acceptance
 

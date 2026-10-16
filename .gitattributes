@@ -1,0 +1,23 @@
+# Normalize line endings: LF in the index and in every working tree.
+# The project is developed in the sbx Linux sandbox and served by DSH on Linux;
+# a CRLF checkout breaks the bash acceptance scripts (`set -o pipefail\r`) and
+# would break anything else that parses these files on Linux.
+* text=auto eol=lf
+
+# Explicit, so these survive a checkout on any platform even if a global
+# core.autocrlf=true is in effect.
+*.sh   text eol=lf
+*.mjs  text eol=lf
+*.js   text eol=lf
+*.ts   text eol=lf
+*.json text eol=lf
+*.yml  text eol=lf
+*.yaml text eol=lf
+
+# Binary — never touch.
+*.png  binary
+*.jpg  binary
+*.ico  binary
+*.zip  binary
+*.epub binary
+*.pdf  binary
