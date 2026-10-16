@@ -1,12 +1,27 @@
 /** Evidence candidates and verified-answer assessment settlement. */
 import {closeOpenLessonSegment,openLessonSegment,passedTaskContent,tasksOfPlan} from '../content/capture.js'
-import {interviewTopics, learnLoopStateSchema, type Assessment, type CriterionAssessment, type LearnerProfile, type LearningProject, type InterviewTopic, type InterviewProbeId, type LearningTask, type LearnLoopState, type CommandResult, type VerifiedTaskAssessment, type WorkspaceLearningState} from '../types.js'
+import type {Assessment, CriterionAssessment, LearningProject, LearnLoopState, VerifiedTaskAssessment} from '../types.js'
 import {activeProject,fail,now,requireToolPhase,uid,workspaceForSession} from './shared.js'
 import {applyWorkspaceCommand} from './bus.js'
 import {advanceMastery} from './mastery.js'
 import {applyReviewSchedule} from './review.js'
-export function createEvidenceCandidate(state:LearnLoopState,input:{sessionId:string;messageIds:string[];answerText:string;contentHash:string;eventSeqs:number[]}){const w=workspaceForSession(state,input.sessionId),p=activeProject(w);if(p.execution?.phase!=='awaiting-answer')fail('CHECK_NOT_ARMED','Check is not awaiting an answer.');if(p.evidenceCandidates.some(c=>c.status==='pending-verification'))fail('CANDIDATE_NOT_READY','Another candidate is pending.');return applyWorkspaceCommand(state,{workspaceId:w.workspaceId,projectId:p.id,sessionId:input.sessionId,expectedRevision:w.revision,idempotencyKey:`candidate:${input.sessionId}:${input.messageIds.join(',')}`},'evidence:candidate',input,(ws,project)=>{const at=now(),task=tasksOfPlan(project!).find(t=>t.id===project!.execution!.taskId);if(!task||task.status!=='active')fail('TASK_NOT_FOUND','Active task missing.');const candidate={id:uid('candidate'),taskId:task.id,conceptId:task.conceptId,source:{sessionId:input.sessionId,messageIds:input.messageIds,eventSeqs:input.eventSeqs,contentHash:input.contentHash},answerText:input.answerText,status:'pending-verification' as const,attempt:project!.execution!.attempt+1,assessmentId:null,createdAt:at,updatedAt:at};const changed={...project!,evidenceCandidates:[...project!.evidenceCandidates,candidate],execution:{...project!.execution!,phase:'verifying' as const,attempt:candidate.attempt,candidateId:candidate.id,updatedAt:at}};return{...ws,projects:{...ws.projects,[changed.id]:changed}}})}
-type AssessmentInput={sessionId:string;idempotencyKey:string;criteria:CriterionAssessment[];overall:'needs-work'|'passed'|'excellent';misconceptions:string[];feedback:string;verifier:VerifiedTaskAssessment['verifier'];provenance:{messageIds:string[];eventSeqs:number[];contentHash:string}};
+
+export function createEvidenceCandidate(state:LearnLoopState,input:{sessionId:string;messageIds:string[];answerText:string;contentHash:string;eventSeqs:number[]}){
+ const w=workspaceForSession(state,input.sessionId),p=activeProject(w)
+ if(p.execution?.phase!=='awaiting-answer')fail('CHECK_NOT_ARMED','Check is not awaiting an answer.')
+ if(p.evidenceCandidates.some(c=>c.status==='pending-verification'))fail('CANDIDATE_NOT_READY','Another candidate is pending.')
+ return applyWorkspaceCommand(state,{workspaceId:w.workspaceId,projectId:p.id,sessionId:input.sessionId,expectedRevision:w.revision,idempotencyKey:`candidate:${input.sessionId}:${input.messageIds.join(',')}`},'evidence:candidate',input,(ws,project)=>{
+  const at=now()
+  const task=tasksOfPlan(project!).find(t=>t.id===project!.execution!.taskId)
+  if(!task||task.status!=='active')fail('TASK_NOT_FOUND','Active task missing.')
+  const candidate={id:uid('candidate'),taskId:task.id,conceptId:task.conceptId,source:{sessionId:input.sessionId,messageIds:input.messageIds,eventSeqs:input.eventSeqs,contentHash:input.contentHash},answerText:input.answerText,status:'pending-verification' as const,attempt:project!.execution!.attempt+1,assessmentId:null,createdAt:at,updatedAt:at}
+  const changed={...project!,evidenceCandidates:[...project!.evidenceCandidates,candidate],execution:{...project!.execution!,phase:'verifying' as const,attempt:candidate.attempt,candidateId:candidate.id,updatedAt:at}}
+  return{...ws,projects:{...ws.projects,[changed.id]:changed}}
+ })
+}
+
+export type AssessmentInput={sessionId:string;idempotencyKey:string;criteria:CriterionAssessment[];overall:'needs-work'|'passed'|'excellent';misconceptions:string[];feedback:string;verifier:VerifiedTaskAssessment['verifier'];provenance:{messageIds:string[];eventSeqs:number[];contentHash:string}}
+
 /**
  * Discard a captured candidate the learner did not mean as an answer (for example a stray chat
  * message sent while a check was armed). The task returns to arming so the learner can answer
@@ -14,11 +29,16 @@ type AssessmentInput={sessionId:string;idempotencyKey:string;criteria:CriterionA
  */
 export function discardEvidenceCandidate(state:LearnLoopState,input:{sessionId:string;idempotencyKey:string}){
  const w=workspaceForSession(state,input.sessionId),p=activeProject(w)
- return applyWorkspaceCommand(state,{workspaceId:w.workspaceId,projectId:p.id,sessionId:input.sessionId,expectedRevision:w.revision,idempotencyKey:input.idempotencyKey},'evidence:discard-candidate',{sessionId:input.sessionId},(ws,project)=>{const execution=project!.execution,candidate=project!.evidenceCandidates.find(c=>c.id===execution?.candidateId)
+ return applyWorkspaceCommand(state,{workspaceId:w.workspaceId,projectId:p.id,sessionId:input.sessionId,expectedRevision:w.revision,idempotencyKey:input.idempotencyKey},'evidence:discard-candidate',{sessionId:input.sessionId},(ws,project)=>{
+  const execution=project!.execution
+  const candidate=project!.evidenceCandidates.find(c=>c.id===execution?.candidateId)
   if(!execution||execution.phase!=='verifying'||!candidate||candidate.status!=='pending-verification')fail('CANDIDATE_NOT_READY','Candidate is not the current active verification.')
-  const at=now(),changed={...project!,evidenceCandidates:project!.evidenceCandidates.map(c=>c.id===candidate.id?{...c,status:'cancelled' as const,updatedAt:at}:c),execution:{...execution,phase:'teaching' as const,candidateId:null,armedAfterSeq:null,sourceSegments:openLessonSegment(closeOpenLessonSegment(execution.sourceSegments,execution.armedAfterSeq??0),input.sessionId,'teaching',null,at),updatedAt:at}}
-  return{...ws,projects:{...ws.projects,[changed.id]:changed}}},current=>({kind:'candidate-discarded',candidateId:current.projects[p.id]!.evidenceCandidates.at(-1)!.id,taskId:p.execution!.taskId,workspaceRevision:current.revision}))
+  const at=now()
+  const changed={...project!,evidenceCandidates:project!.evidenceCandidates.map(c=>c.id===candidate.id?{...c,status:'cancelled' as const,updatedAt:at}:c),execution:{...execution,phase:'teaching' as const,candidateId:null,armedAfterSeq:null,sourceSegments:openLessonSegment(closeOpenLessonSegment(execution.sourceSegments,execution.armedAfterSeq??0),input.sessionId,'teaching',null,at),updatedAt:at}}
+  return{...ws,projects:{...ws.projects,[changed.id]:changed}}
+ },current=>({kind:'candidate-discarded',candidateId:current.projects[p.id]!.evidenceCandidates.at(-1)!.id,taskId:p.execution!.taskId,workspaceRevision:current.revision}))
 }
+
 /**
  * The verifier releases a captured message that asks something instead of answering the check.
  * The check returns to teaching so the model can answer the question; no assessment is written and
@@ -28,10 +48,58 @@ export function releaseCurrentCandidate(state:LearnLoopState,input:{sessionId:st
  const w=workspaceForSession(state,input.sessionId),p=activeProject(w)
  if(!state.commandReceipts.some(r=>r.workspaceId===w.workspaceId&&r.idempotencyKey===input.idempotencyKey))requireToolPhase(p,'learnloop_release_check')
  const candidateId=p.execution?.candidateId??null
- return applyWorkspaceCommand(state,{workspaceId:w.workspaceId,projectId:p.id,sessionId:input.sessionId,expectedRevision:w.revision,idempotencyKey:input.idempotencyKey},'evidence:release-candidate',{reason:input.reason},(ws,project)=>{const execution=project!.execution,candidate=project!.evidenceCandidates.find(c=>c.id===execution?.candidateId)
+ return applyWorkspaceCommand(state,{workspaceId:w.workspaceId,projectId:p.id,sessionId:input.sessionId,expectedRevision:w.revision,idempotencyKey:input.idempotencyKey},'evidence:release-candidate',{reason:input.reason},(ws,project)=>{
+  const execution=project!.execution
+  const candidate=project!.evidenceCandidates.find(c=>c.id===execution?.candidateId)
   if(!execution||execution.phase!=='verifying'||!candidate||candidate.status!=='pending-verification'||candidate.source.sessionId!==input.sessionId)fail('CANDIDATE_NOT_READY','Candidate is not the current active verification.')
-  const at=now(),changed={...project!,evidenceCandidates:project!.evidenceCandidates.map(c=>c.id===candidate.id?{...c,status:'cancelled' as const,updatedAt:at}:c),execution:{...execution,phase:'teaching' as const,attempt:Math.max(0,candidate.attempt-1),candidateId:null,armedAfterSeq:null,sourceSegments:openLessonSegment(closeOpenLessonSegment(execution.sourceSegments,execution.armedAfterSeq??0),input.sessionId,'teaching',null,at),updatedAt:at}}
-  return{...ws,projects:{...ws.projects,[changed.id]:changed}}},current=>({kind:'candidate-discarded',candidateId:candidateId??current.projects[p.id]!.evidenceCandidates.at(-1)!.id,taskId:p.execution!.taskId,workspaceRevision:current.revision}))
+  const at=now()
+  const changed={...project!,evidenceCandidates:project!.evidenceCandidates.map(c=>c.id===candidate.id?{...c,status:'cancelled' as const,updatedAt:at}:c),execution:{...execution,phase:'teaching' as const,attempt:Math.max(0,candidate.attempt-1),candidateId:null,armedAfterSeq:null,sourceSegments:openLessonSegment(closeOpenLessonSegment(execution.sourceSegments,execution.armedAfterSeq??0),input.sessionId,'teaching',null,at),updatedAt:at}}
+  return{...ws,projects:{...ws.projects,[changed.id]:changed}}
+ },current=>({kind:'candidate-discarded',candidateId:candidateId??current.projects[p.id]!.evidenceCandidates.at(-1)!.id,taskId:p.execution!.taskId,workspaceRevision:current.revision}))
 }
-export function assessCurrentCandidate(state:LearnLoopState,input:AssessmentInput){const w=workspaceForSession(state,input.sessionId),p=activeProject(w);if(!state.commandReceipts.some(r=>r.workspaceId===w.workspaceId&&r.idempotencyKey===input.idempotencyKey))requireToolPhase(p,'learnloop_assess_answer');return applyWorkspaceCommand(state,{workspaceId:w.workspaceId,projectId:p.id,sessionId:input.sessionId,expectedRevision:w.revision,idempotencyKey:input.idempotencyKey},'evidence:assess',{criteria:input.criteria,overall:input.overall,misconceptions:input.misconceptions,feedback:input.feedback},(ws,project)=>{const execution=project!.execution,candidate=project!.evidenceCandidates.find(c=>c.id===execution?.candidateId),task=tasksOfPlan(project!).find(t=>t.id===candidate?.taskId);const isReview=execution?.isReview??false;const allowedTaskStatus=isReview?['completed']:['active'];if(execution?.phase!=='verifying'||!candidate||candidate.status!=='pending-verification'||candidate.source.sessionId!==input.sessionId||!task||!allowedTaskStatus.includes(task.status)||execution.taskId!==task.id)fail('CANDIDATE_NOT_READY','Candidate is not the current active verification.');if(!input.provenance.eventSeqs.length||input.provenance.messageIds.join()!==candidate.source.messageIds.join()||input.provenance.contentHash!==candidate.source.contentHash)fail('CANDIDATE_SOURCE_MISSING','Candidate provenance is incomplete or inconsistent.');const expected=task.acceptanceCriteria.length,indexes=input.criteria.map(c=>c.criterionIndex);if(input.criteria.length!==expected||new Set(indexes).size!==expected||indexes.some(i=>i<0||i>=expected)||!Array.from({length:expected},(_,i)=>i).every(i=>indexes.includes(i)))fail('ASSESSMENT_INVALID','Criterion results must cover the task exactly once.');const allPassed=input.criteria.every(c=>c.result==='passed'),hasGap=input.criteria.some(c=>c.result!=='passed');if((input.overall==='needs-work'&&!hasGap)||(input.overall!=='needs-work'&&!allPassed))fail('ASSESSMENT_INVALID','Overall result contradicts criterion results.');const at=now(),assessment:Assessment={id:uid('assessment'),candidateId:candidate.id,taskId:candidate.taskId,conceptId:candidate.conceptId,result:input.overall,criteria:input.criteria,misconceptions:input.misconceptions,feedback:input.feedback,verifier:input.verifier,createdAt:at};let changed:LearningProject={...project!,assessments:[...project!.assessments,assessment],evidenceCandidates:project!.evidenceCandidates.map(c=>c.id===candidate.id?{...c,source:{sessionId:input.sessionId,...input.provenance},status:input.overall==='needs-work'?'needs-work' as const:'accepted' as const,assessmentId:assessment.id,updatedAt:at}:c),misconceptions:[...new Set([...project!.misconceptions,...input.misconceptions])],execution:{...execution,phase:input.overall==='needs-work'?'needs-revision' as const:'passed' as const,candidateId:null,lastAssessmentId:assessment.id,armedAfterSeq:null,sourceSegments:input.overall==='needs-work'?openLessonSegment(closeOpenLessonSegment(execution.sourceSegments,input.verifier.assistantMessageEventSeq),input.sessionId,'needs-revision',input.verifier.assistantMessageEventSeq,at):closeOpenLessonSegment(execution.sourceSegments,input.verifier.assistantMessageEventSeq),updatedAt:at}};if(input.overall!=='needs-work'){const evidence={id:uid('evidence'),idempotencyKey:input.idempotencyKey,conceptId:candidate.conceptId,kind:'assessment' as const,summary:input.feedback,assessmentId:assessment.id,source:{...input.provenance,sessionId:input.sessionId},createdAt:at};if(isReview){const priorEvidenceCount=changed.mastery.find(r=>r.conceptId===candidate.conceptId)?.evidenceIds.length??0;changed={...changed,evidence:[...changed.evidence,evidence],mastery:applyReviewSchedule(advanceMastery(changed.mastery,evidence,input.feedback,at),candidate.conceptId,true,priorEvidenceCount+1,at),execution:null,activeReviewTaskId:null}}else{changed={...changed,evidence:[...changed.evidence,evidence],mastery:advanceMastery(changed.mastery,evidence,input.feedback,at),plans:changed.plans.map(plan=>plan.id===changed.activePlanId?{...plan,stages:plan.stages.map(s=>({...s,tasks:s.tasks.map(t=>t.id===candidate.taskId?{...t,status:'completed' as const}:t)}))}:plan)};changed={...changed,content:passedTaskContent(changed.content,ws.workspaceId,changed,task,assessment.id,changed.execution!.sourceSegments,at)}}}return{...ws,projects:{...ws.projects,[changed.id]:changed}}},current=>{const settled=current.projects[p.id]!,assessment=settled.assessments.at(-1)!,wasReview=settled.activeReviewTaskId===null&&p.activeReviewTaskId!==null;return{kind:'assessment-settled',assessmentId:assessment.id,candidateId:assessment.candidateId,taskId:assessment.taskId,result:assessment.result,taskCompleted:!wasReview&&assessment.result!=='needs-work',failedCriteria:assessment.criteria.filter(c=>c.result!=='passed').map(c=>c.criterionIndex),feedback:assessment.feedback,workspaceRevision:current.revision}})}
+
+export function assessCurrentCandidate(state:LearnLoopState,input:AssessmentInput){
+ const w=workspaceForSession(state,input.sessionId),p=activeProject(w)
+ if(!state.commandReceipts.some(r=>r.workspaceId===w.workspaceId&&r.idempotencyKey===input.idempotencyKey))requireToolPhase(p,'learnloop_assess_answer')
+ return applyWorkspaceCommand(state,{workspaceId:w.workspaceId,projectId:p.id,sessionId:input.sessionId,expectedRevision:w.revision,idempotencyKey:input.idempotencyKey},'evidence:assess',{criteria:input.criteria,overall:input.overall,misconceptions:input.misconceptions,feedback:input.feedback},(ws,project)=>{
+  // Resolve context and validate preconditions.
+  const execution=project!.execution
+  const candidate=project!.evidenceCandidates.find(c=>c.id===execution?.candidateId)
+  const isReview=execution?.isReview??false
+  const allowedStatus=isReview?['completed']:['active']
+  const task=tasksOfPlan(project!).find(t=>t.id===candidate?.taskId)
+  if(execution?.phase!=='verifying'||!candidate||candidate.status!=='pending-verification'||candidate.source.sessionId!==input.sessionId||!task||!allowedStatus.includes(task.status)||execution.taskId!==task.id)fail('CANDIDATE_NOT_READY','Candidate is not the current active verification.')
+  if(!input.provenance.eventSeqs.length||input.provenance.messageIds.join()!==candidate.source.messageIds.join()||input.provenance.contentHash!==candidate.source.contentHash)fail('CANDIDATE_SOURCE_MISSING','Candidate provenance is incomplete or inconsistent.')
+  // Validate criterion coverage.
+  const expected=task.acceptanceCriteria.length
+  const indexes=input.criteria.map(c=>c.criterionIndex)
+  if(input.criteria.length!==expected||new Set(indexes).size!==expected||indexes.some(i=>i<0||i>=expected)||!Array.from({length:expected},(_,i)=>i).every(i=>indexes.includes(i)))fail('ASSESSMENT_INVALID','Criterion results must cover the task exactly once.')
+  const allPassed=input.criteria.every(c=>c.result==='passed'),hasGap=input.criteria.some(c=>c.result!=='passed')
+  if((input.overall==='needs-work'&&!hasGap)||(input.overall!=='needs-work'&&!allPassed))fail('ASSESSMENT_INVALID','Overall result contradicts criterion results.')
+  const at=now()
+  const assessment:Assessment={id:uid('assessment'),candidateId:candidate.id,taskId:candidate.taskId,conceptId:candidate.conceptId,result:input.overall,criteria:input.criteria,misconceptions:input.misconceptions,feedback:input.feedback,verifier:input.verifier,createdAt:at}
+  // Build the base project state: record assessment, settle candidate, append misconceptions, update execution phase.
+  let changed:LearningProject={...project!,assessments:[...project!.assessments,assessment],evidenceCandidates:project!.evidenceCandidates.map(c=>c.id===candidate.id?{...c,source:{sessionId:input.sessionId,...input.provenance},status:input.overall==='needs-work'?'needs-work' as const:'accepted' as const,assessmentId:assessment.id,updatedAt:at}:c),misconceptions:[...new Set([...project!.misconceptions,...input.misconceptions])],execution:{...execution,phase:input.overall==='needs-work'?'needs-revision' as const:'passed' as const,candidateId:null,lastAssessmentId:assessment.id,armedAfterSeq:null,sourceSegments:input.overall==='needs-work'?openLessonSegment(closeOpenLessonSegment(execution.sourceSegments,input.verifier.assistantMessageEventSeq),input.sessionId,'needs-revision',input.verifier.assistantMessageEventSeq,at):closeOpenLessonSegment(execution.sourceSegments,input.verifier.assistantMessageEventSeq),updatedAt:at}}
+  if(input.overall!=='needs-work'){
+   const evidence={id:uid('evidence'),idempotencyKey:input.idempotencyKey,conceptId:candidate.conceptId,kind:'assessment' as const,summary:input.feedback,assessmentId:assessment.id,source:{...input.provenance,sessionId:input.sessionId},createdAt:at}
+   if(isReview){
+    // Review: advance mastery and reschedule; the task stays completed, no content pipeline runs.
+    const priorCount=changed.mastery.find(r=>r.conceptId===candidate.conceptId)?.evidenceIds.length??0
+    changed={...changed,evidence:[...changed.evidence,evidence],mastery:applyReviewSchedule(advanceMastery(changed.mastery,evidence,input.feedback,at),candidate.conceptId,true,priorCount+1,at),execution:null,activeReviewTaskId:null}
+   }else{
+    // Regular pass: complete the task and run the content pipeline.
+    changed={...changed,evidence:[...changed.evidence,evidence],mastery:advanceMastery(changed.mastery,evidence,input.feedback,at),plans:changed.plans.map(plan=>plan.id===changed.activePlanId?{...plan,stages:plan.stages.map(s=>({...s,tasks:s.tasks.map(t=>t.id===candidate.taskId?{...t,status:'completed' as const}:t)}))}:plan)}
+    changed={...changed,content:passedTaskContent(changed.content,ws.workspaceId,changed,task,assessment.id,changed.execution!.sourceSegments,at)}
+   }
+  }
+  return{...ws,projects:{...ws.projects,[changed.id]:changed}}
+ },current=>{
+  const settled=current.projects[p.id]!
+  const assessment=settled.assessments.at(-1)!
+  // wasReview: the review was active before this command and is cleared now.
+  const wasReview=settled.activeReviewTaskId===null&&p.activeReviewTaskId!==null
+  return{kind:'assessment-settled',assessmentId:assessment.id,candidateId:assessment.candidateId,taskId:assessment.taskId,result:assessment.result,taskCompleted:!wasReview&&assessment.result!=='needs-work',failedCriteria:assessment.criteria.filter(c=>c.result!=='passed').map(c=>c.criterionIndex),feedback:assessment.feedback,workspaceRevision:current.revision}
+ })
+}
+
 /** Builds explicit learner evidence for deterministic domain fixtures; production paths record canonical tool/message results. */
