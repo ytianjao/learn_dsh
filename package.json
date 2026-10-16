@@ -34,6 +34,7 @@
   },
   "scripts": {
     "build": "tsdown",
+    "build:client": "node scripts/build-client.mjs",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src tests --max-warnings 0",
     "test": "vitest run",
@@ -45,7 +46,7 @@
     "acceptance:test": "node ./node_modules/@playwright/test/cli.js test",
     "e2e:keyless:web": "node scripts/keyless-web-e2e.mjs",
     "acceptance:reset": "bash scripts/cloud-acceptance-reset.sh",
-    "check": "pnpm run typecheck && node --check client/bundle.js && pnpm test",
+    "check": "pnpm run typecheck && node --check client/bundle.js && pnpm test && node scripts/build-client.mjs && git diff --exit-code client/bundle.js",
     "package:validate": "npm pack --dry-run",
     "prepare": "pnpm run build",
     "test:evidence": "vitest run tests/evidence-bridge.spec.ts",

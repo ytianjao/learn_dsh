@@ -29,7 +29,23 @@ pnpm vitest run tests/http.spec.ts -t "idempot"  # spec + name filter combine
 
 `pnpm run check` is exactly what CI's `full-suite` job runs, minus `package:validate`.
 
-## `client/bundle.js` beyond "edit it directly"
+## `client/bundle.js` — generated artifact
+
+`client/bundle.js` is built from `client/src/*.js` source modules by `scripts/build-client.mjs`.
+Edit the source modules, then run:
+
+```bash
+pnpm run build:client   # rebuilds client/bundle.js from client/src/
+pnpm run check          # typecheck + rebuild + drift check + vitest
+```
+
+`pnpm run check` includes `git diff --exit-code client/bundle.js`; a committed bundle that
+doesn't match its sources fails CI. Never edit `client/bundle.js` directly — edit the source
+module it belongs to and rebuild.
+
+The split into numbered modules (`00-constants`, `01-store`, …, `10-plugin`) mirrors the
+original single-file order. The builder concatenates them in alphabetical order inside the
+factory IIFE wrapper.
 
 DSH loads it through `window.__ModuleLoader__`. What that means for testing it:
 

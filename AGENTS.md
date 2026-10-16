@@ -96,8 +96,9 @@ Only what file names do not tell you:
 - `src/evidence-bridge.ts`, `src/dsh-session-adapter.ts` — capture the learner's answer from
   DSH events and check its provenance, fail-closed.
 - `src/content/` — the lesson pipeline; `publish/` holds the exporters.
-- `client/bundle.js` — hand-authored source with no build step; edit it directly. Specs run it
-  in a `node:vm` sandbox.
+- `client/bundle.js` — **generated artifact**; edit `client/src/*.js` source modules and run
+  `pnpm run build:client` to rebuild. Specs run the built file in a `node:vm` sandbox.
+  `pnpm run check` rebuilds and verifies no drift (`git diff --exit-code client/bundle.js`).
 
 ## Commands
 
