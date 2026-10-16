@@ -4,7 +4,7 @@
 
 | 项目 / Item | 固定值 / Pin |
 | --- | --- |
-| DeepSeek Harness | `0.2.1-alpha.1`（npm 发布版 / npm release，`alpha` 频道） |
+| DeepSeek Harness | `package.json` peer 范围内的 npm 发布版（`alpha` 频道；实际版本见 `pnpm-lock.yaml`）/ npm release inside the `package.json` peer range (`alpha` channel; installed version in `pnpm-lock.yaml`) |
 | Node | `22.19.0`（DSH 支持 `^22.19.0 || >=24.0.0`） |
 | pnpm | `11.7.0` |
 | Plugin install / 插件安装 | `dsh plugin --profile web add <repo>` |

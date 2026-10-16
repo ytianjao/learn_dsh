@@ -23,52 +23,17 @@ The keyless browser lane runs the DSH CLI installed from npm at the range pinned
 After the user configures a key in DSH Settings → Models, send one teaching message and verify streaming. LearnLoop never reads the key; this step is outside keyless automation.
 
 
-## DSH Chat generated plans (PR #13)
+## 产品语义 / Product semantics
 
-LearnLoop now creates an empty active plan and sends a structured planning request through the public DSH Chat `InputActions`. The selected DSH model must publish the complete authoritative plan with `learnloop_create_plan_draft`; LearnLoop never reads API keys, calls a provider, or parses assistant prose. The Host validates keys, sizes, uniqueness, dependency references and DAG shape, then assigns IDs/status/version and commits plan, mastery, events, and one revision atomically.
+运行时契约、Session 隔离、持久化边界、交互协议与审阅边界的唯一定义在 `docs/PRODUCT_CONTRACT.md`；验收按该文档执行，这里不复述。
 
-User flow: (1) configure and select a model in **DSH Settings → Models**; (2) enter a LearnLoop goal; (3) choose **Start learning**; (4) observe the planning request in Chat; (5) the model calls `learnloop_create_plan_draft`; (6) the model introduces the returned first task; (7) choose **Start task in chat** for teaching; (8) submit your own evidence in LearnLoop; (9) export before using **Discard current plan** to start over. Normal `dsh web` uses the selected user model; only browser E2E uses the deterministic mock provider.
-
-DSH owns session, Chat, model routing, streaming, credentials, and the tool execution runtime. LearnLoop owns the learning project, validated structured plan, evidence, mastery, review, and plan-publication rules. Discard is destructive, not history archival: it removes current business data while preserving settings. Export first when an audit copy is required.
-
-## LearnLoop Runtime V2 contract
-
-- **User message:** visible and intent-only; retains the learner's original semantics and never contains LearnLoop control prompts or state JSON.
-- **System Prompt:** Host-generated, session-scoped, recorded in DSH request/header and Trajectory, and supplies planning, learning-mode, and progression constraints.
-- **Hard gate:** `Task N != completed => Task N+1 cannot become active`. Only domain commands advance plan state; model prose has no completion authority.
-- **Mode gate:** `practiceCapacity=none => no implementation task and no artifact completion requirement`.
-- **Migration:** v1 projects, plans, evidence, and mastery are retained; tasks receive safe lesson/short-answer defaults and projects require explicit session binding.
-- **Current limitation:** no semantic post-filter rewrites arbitrary provider output. The deterministic state gate is enforced locally while recurring teaching behavior is constrained through DSH System Prompt. Inline checkpoints use the placeholder message range `learnloop-inline-checkpoint`.
-
-## Runtime hardening (PR #20)
-
-A LearnLoop Workspace may attach its active Project to the current DSH Session for execution. The Host returns a server-redacted projection to foreign sessions and rejects their project mutations; this local product-state isolation prevents accidental cross-session access, but is not multi-user or multi-tenant authentication. Same-origin remains the HTTP write boundary and LearnLoop never receives model credentials.
-
-Task status changes are available only through semantic commands: start, pause, resume, skip, safe restore, and atomic completion with evidence. A blocked task remains the current learning position; only completed or skipped dependencies are satisfied, and skipping never means mastery. Completing a task does not auto-start its successor.
-
-Invariants: `project.sessionId === mutation.sessionId`; active and blocked current tasks cannot coexist; `foreign => no project, plan, evidence, mastery, assessment, or event content`.
+The runtime contract, Session isolation, persistence boundary, interaction protocol, and review boundary are defined once, in `docs/PRODUCT_CONTRACT.md`; acceptance follows that document and does not restate it.
 
 ## Browser trust boundary
-The web client may call only begin/cancel check for verification. It never sends confidence, message identifiers, event sequence, criterion result, or task completion. Owner export uses the dedicated export endpoint; settings-only and foreign views cannot download a project.
-
-
-## Canonical persistence boundary (0.2.0)
-
-The state stores business data only at `workspaces[workspaceId].projects[projectId]`. Projects independently own profile, plans, execution, candidates, verified evidence and assessments, mastery, and misconceptions. `activeSessionId` is an execution attachment, not ownership. API v3 reads by Workspace; the current Storage Domain version rejects states from earlier epochs (see `CHANGELOG.md`). No code automatically resets or deletes DSH data.
-
-## Current LearnLoop interaction protocol
-
-Activation is Host-owned: button → HTTP `begin-learning-mode` → `interviewing` Project → visible learner intent. The agent drives the Host-defined interview, the Host compiles the Profile and obtains explicit Profile confirmation, the agent creates a Draft Plan, and asks the learner to **确认并启用计划 / Confirm and activate plan**. After confirmation the Plan is active, execution is null, and all Tasks remain pending. Teaching starts only after the learner explicitly starts the first Task in LearnLoop. LearnLoop phase policy and domain guards reject wrong-phase model calls with `INVALID_PROJECT_PHASE`; model-visible outputs use semantic fields such as `profileRevision`, `planId`, and `planVersion`, never a generic workspace revision.
-
-## Runtime V4 review boundary
-
-Onboarding uses one persisted interview topic at a time. Profile and Plan review decisions are Host-authoritative UI/HTTP actions; model approval tools are absent. Approval never starts a task.
-
-
----
+The web client may call only begin/cancel check for verification. It never sends confidence, message identifiers, event sequence, criterion result, or task completion. A Workspace backup uses the dedicated export endpoint, which Settings links per Workspace; every mutation carries the `x-learnloop-mutation` header (`docs/PRODUCT_CONTRACT.md`, Privacy and security).
 
 # Keyless Web Acceptance
 
-DSH 0.1.6 gates the browser client behind per-launch browser-session authentication: the orchestrator must read the `?token=` URL printed by `dsh web` and pass it to Playwright as `DSH_WEB_URL`; API routes remain reachable for readiness polling. / DSH 0.1.6 对浏览器客户端启用了每次启动生成令牌认证的认证：编排脚本必须读取 `dsh web` 打印的 `?token=` URL 并作为 `DSH_WEB_URL` 传给 Playwright；就绪轮询使用的 API 路由不受影响。
+Since 0.1.6, DSH gates the browser client behind per-launch browser-session authentication: the orchestrator must read the `?token=` URL printed by `dsh web` and pass it to Playwright as `DSH_WEB_URL`; API routes remain reachable for readiness polling. / 自 0.1.6 起，DSH 对浏览器客户端启用了每次启动生成令牌认证的认证：编排脚本必须读取 `dsh web` 打印的 `?token=` URL 并作为 `DSH_WEB_URL` 传给 Playwright；就绪轮询使用的 API 路由不受影响。
 
 The deterministic provider reads the latest `LEARNLOOP_STATE_V1` Host control (`requiredTools`), the latest tool result's `nextQuestion`, visible Tool names, and the learner subject, and answers in plain text outside the interview. Its log records, per request, the message count, system-message count, state-block count, and declared tools, so a regression to per-step system copies or tool toggling is visible. `MOCK_MODEL_POLICY=null` sends no token on the first question and only the token afterwards; the default enhancing policy relabels the quantitative-trading `goal.outcome` codes, adds the optional `time-budget.deadline` Probe, and assumes the practice constraints. The browser path also edits an unasked field in the review dialog and checks it survives a reload. Run the lane under both policies. Playwright must use the real custom field and real option click; no state injection or skip is permitted. Preserve `mock-provider.log`, `dsh-web.log`, `fixture-setup.log`, trace, and screenshots as CI artifacts.

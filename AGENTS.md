@@ -151,3 +151,6 @@ Focused suites and acceptance scripts are in `package.json` `scripts`; CI jobs a
   back to `do-not-retry`, which strands the model on errors it could repair.
 - **Behavior** → update the matching `docs/` file and `CHANGELOG.md`. This file changes only
   when a rule or a change procedure does.
+- **Docs** → a product rule is defined once, in `docs/PRODUCT_CONTRACT.md`; other docs link to it.
+  A superseded rule moves to that file's History section, never stays inline. Current docs may
+  repeat a version fact only if it equals its source; `tests/doc-facts.spec.ts` enforces this.

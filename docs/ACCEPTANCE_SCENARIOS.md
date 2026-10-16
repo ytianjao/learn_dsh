@@ -23,49 +23,14 @@ CI 自动覆盖 build、typecheck、lint、领域/HTTP、package validation、�
 CI covers build, typecheck, lint, domain/HTTP tests, package validation, keyless DSH boot, browser slices, refresh persistence, and artifacts. Live DeepSeek conversation, billed-account behavior, and production network failures are user-opt-in and cannot be required PR gates.
 
 
-## DSH Chat generated plans (PR #13)
+## 产品语义 / Product semantics
 
-LearnLoop now creates an empty active plan and sends a structured planning request through the public DSH Chat `InputActions`. The selected DSH model must publish the complete authoritative plan with `learnloop_create_plan_draft`; LearnLoop never reads API keys, calls a provider, or parses assistant prose. The Host validates keys, sizes, uniqueness, dependency references and DAG shape, then assigns IDs/status/version and commits plan, mastery, events, and one revision atomically.
+运行时契约、Session 隔离、持久化边界、交互协议与审阅边界的唯一定义在 `docs/PRODUCT_CONTRACT.md`；验收按该文档执行，这里不复述。
 
-User flow: (1) configure and select a model in **DSH Settings → Models**; (2) enter a LearnLoop goal; (3) choose **Start learning**; (4) observe the planning request in Chat; (5) the model calls `learnloop_create_plan_draft`; (6) the model introduces the returned first task; (7) choose **Start task in chat** for teaching; (8) submit your own evidence in LearnLoop; (9) export before using **Discard current plan** to start over. Normal `dsh web` uses the selected user model; only browser E2E uses the deterministic mock provider.
-
-DSH owns session, Chat, model routing, streaming, credentials, and the tool execution runtime. LearnLoop owns the learning project, validated structured plan, evidence, mastery, review, and plan-publication rules. Discard is destructive, not history archival: it removes current business data while preserving settings. Export first when an audit copy is required.
-
-## LearnLoop Runtime V2 contract
-
-- **User message:** visible and intent-only; retains the learner's original semantics and never contains LearnLoop control prompts or state JSON.
-- **System Prompt:** Host-generated, session-scoped, recorded in DSH request/header and Trajectory, and supplies planning, learning-mode, and progression constraints.
-- **Hard gate:** `Task N != completed => Task N+1 cannot become active`. Only domain commands advance plan state; model prose has no completion authority.
-- **Mode gate:** `practiceCapacity=none => no implementation task and no artifact completion requirement`.
-- **Migration:** v1 projects, plans, evidence, and mastery are retained; tasks receive safe lesson/short-answer defaults and projects require explicit session binding.
-- **Current limitation:** no semantic post-filter rewrites arbitrary provider output. The deterministic state gate is enforced locally while recurring teaching behavior is constrained through DSH System Prompt. Inline checkpoints use the placeholder message range `learnloop-inline-checkpoint`.
-
-## Runtime hardening (PR #20)
-
-A LearnLoop Workspace may attach its active Project to the current DSH Session for execution. The Host returns a server-redacted projection to foreign sessions and rejects their project mutations; this local product-state isolation prevents accidental cross-session access, but is not multi-user or multi-tenant authentication. Same-origin remains the HTTP write boundary and LearnLoop never receives model credentials.
-
-Task status changes are available only through semantic commands: start, pause, resume, skip, safe restore, and atomic completion with evidence. A blocked task remains the current learning position; only completed or skipped dependencies are satisfied, and skipping never means mastery. Completing a task does not auto-start its successor.
-
-Invariants: `project.sessionId === mutation.sessionId`; active and blocked current tasks cannot coexist; `foreign => no project, plan, evidence, mastery, assessment, or event content`.
+The runtime contract, Session isolation, persistence boundary, interaction protocol, and review boundary are defined once, in `docs/PRODUCT_CONTRACT.md`; acceptance follows that document and does not restate it.
 
 ## Verified answer scenario
-Arm the active task, answer in normal Chat, observe needs-work without evidence/completion, arm again, answer correctly, then observe one atomic passed settlement. Confirm the successor stays pending until explicit start and a foreign Session sees no private projection.
-
-
-## Canonical persistence boundary (0.2.0)
-
-The state stores business data only at `workspaces[workspaceId].projects[projectId]`. Projects independently own profile, plans, execution, candidates, verified evidence and assessments, mastery, and misconceptions. `activeSessionId` is an execution attachment, not ownership. API v3 reads by Workspace; the current Storage Domain version rejects states from earlier epochs (see `CHANGELOG.md`). No code automatically resets or deletes DSH data.
-
-## Current LearnLoop interaction protocol
-
-Activation is Host-owned: button → HTTP `begin-learning-mode` → `interviewing` Project → visible learner intent. The agent drives the Host-defined interview, the Host compiles the Profile and obtains explicit Profile confirmation, the agent creates a Draft Plan, and asks the learner to **确认并启用计划 / Confirm and activate plan**. After confirmation the Plan is active, execution is null, and all Tasks remain pending. Teaching starts only after the learner explicitly starts the first Task in LearnLoop. LearnLoop phase policy and domain guards reject wrong-phase model calls with `INVALID_PROJECT_PHASE`; model-visible outputs use semantic fields such as `profileRevision`, `planId`, and `planVersion`, never a generic workspace revision.
-
-## Runtime V4 review boundary
-
-Onboarding uses one persisted interview topic at a time. Profile and Plan review decisions are Host-authoritative UI/HTTP actions; model approval tools are absent. Approval never starts a task.
-
-
----
+Arm the active task, answer in normal Chat, observe needs-work without evidence/completion, arm again, answer correctly, then observe one atomic passed settlement. Confirm the successor stays pending until explicit start, and that a Session attached to another Workspace cannot mutate this Project (`WORKSPACE_MISMATCH`).
 
 # Acceptance Scenarios
 
