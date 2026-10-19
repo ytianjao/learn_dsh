@@ -62,8 +62,12 @@ Breaking one of these is a design change, not a refactor.
   `src/content/privacy.ts`; the model's own redaction is not trusted. Lesson source snapshots
   are bounded — never raw transcripts, learner answers, system prompts, tool payloads,
   credentials, or local paths.
-- **Strict Zod at every boundary.** `tsconfig.json` is `strict: false`; type safety comes from
-  `.strict()` Zod schemas at runtime. Do not loosen them; parse, don't cast.
+- **Strict Zod at every boundary, and strict TypeScript inside it.** `tsconfig.json` has
+  `strict: true` with `skipLibCheck: false`, and `eslint.config.js` applies type-aware rules to
+  `src/` (floating promises, promise-misuse, switch exhaustiveness). Zod guards data entering the
+  system; TypeScript guards the composition inside it. Neither replaces the other: keep both, do
+  not loosen a `.strict()` schema, and do not reach for `as any` or `ts-nocheck` to quiet a
+  diagnostic — narrow, or parse. `tests/static-guards.spec.ts` proves each check still fires.
 - **Persistence epochs are clean breaks.** Older states and backups are rejected. There is no
   migration, compatibility alias, or automatic reset or deletion. A stale stored state must not
   stop `dsh web`: `src/storage-recovery.ts` starts LearnLoop degraded, and only the learner's
@@ -92,8 +96,9 @@ Only what file names do not tell you:
 - `src/evidence-bridge.ts`, `src/dsh-session-adapter.ts` — capture the learner's answer from
   DSH events and check its provenance, fail-closed.
 - `src/content/` — the lesson pipeline; `publish/` holds the exporters.
-- `client/bundle.js` — hand-authored source with no build step; edit it directly. Specs run it
-  in a `node:vm` sandbox.
+- `client/bundle.js` — **generated artifact**; edit `client/src/*.js` source modules and run
+  `pnpm run build:client` to rebuild. Specs run the built file in a `node:vm` sandbox.
+  `pnpm run check` rebuilds and verifies no drift (`git diff --exit-code client/bundle.js`).
 
 ## Commands
 
@@ -151,3 +156,6 @@ Focused suites and acceptance scripts are in `package.json` `scripts`; CI jobs a
   back to `do-not-retry`, which strands the model on errors it could repair.
 - **Behavior** → update the matching `docs/` file and `CHANGELOG.md`. This file changes only
   when a rule or a change procedure does.
+- **Docs** → a product rule is defined once, in `docs/PRODUCT_CONTRACT.md`; other docs link to it.
+  A superseded rule moves to that file's History section, never stays inline. Current docs may
+  repeat a version fact only if it equals its source; `tests/doc-facts.spec.ts` enforces this.

@@ -5,6 +5,7 @@ import {z} from 'zod'
 import {dshHomePath} from '@deepseek-ai/dsh-home-paths'
 import {LearnLoopDomainError,learnLoopDomainSpec} from './domain.js'
 import {MANAGE_PATH} from './http.js'
+import {assertMutationRequest,readJsonBody} from './request-boundary.js'
 
 /**
  * Recovery from a stored state of another persistence epoch. DSH refuses to open a Storage Domain
@@ -38,16 +39,17 @@ export function moveIncompatibleStorageAside(file=storageFilePath(),backupDirect
 }
 
 const resetRequest=z.object({action:z.literal('reset-incompatible-storage')}).strict()
+/** Boundary refusals keep their own status while degraded; everything else reports the epoch break. */
+const recoveryStatus=(code:LearnLoopDomainError['code'])=>code==='REQUEST_FORBIDDEN'?403:code==='REQUEST_TOO_LARGE'?413:code==='INVALID_ARGS'?400:503
 const json=(res:ServerResponse,status:number,value:unknown)=>{res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'});res.end(JSON.stringify(value))}
-async function body(req:IncomingMessage){const chunks:Buffer[]=[];for await(const c of req)chunks.push(Buffer.from(c));return JSON.parse(Buffer.concat(chunks).toString()) as unknown}
 /** Serves every LearnLoop route while degraded: reads report the incompatibility, and one management action resets. */
 export function createIncompatibleStorageHandler(stale:IncompatibleStorage,reset:()=>Promise<string>){
  let pending:Promise<string>|null=null
  return async(req:IncomingMessage,res:ServerResponse)=>{
   const url=new URL(req.url??MANAGE_PATH,'http://localhost')
   if(req.method==='POST'&&url.pathname===MANAGE_PATH){
-   try{resetRequest.parse(await body(req));const backupFile=await(pending??=reset());json(res,200,{status:'reset',backupFile})}
-   catch(error){pending=null;json(res,error instanceof LearnLoopDomainError?503:400,{error:{code:error instanceof LearnLoopDomainError?error.code:'REQUEST_FAILED',message:error instanceof Error?error.message.split('\nLEARNLOOP_SAFE_ERROR:')[0]:'Request failed'},incompatibleStorage:stale})}
+   try{assertMutationRequest(req);resetRequest.parse(await readJsonBody(req));const backupFile=await(pending??=reset());json(res,200,{status:'reset',backupFile})}
+   catch(error){pending=null;json(res,error instanceof LearnLoopDomainError?recoveryStatus(error.code):400,{error:{code:error instanceof LearnLoopDomainError?error.code:'REQUEST_FAILED',message:error instanceof Error?error.message.split('\nLEARNLOOP_SAFE_ERROR:')[0]:'Request failed'},incompatibleStorage:stale})}
    return
   }
   json(res,503,{error:{code:'STORAGE_EPOCH_INCOMPATIBLE',message:'Stored LearnLoop data is from another version. Clear the old data to continue; it is moved to a backup, not deleted.'},incompatibleStorage:stale})

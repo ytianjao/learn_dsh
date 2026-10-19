@@ -4,7 +4,7 @@ import {LearnLoopDomainError, payloadHash} from '../domain.js'
 import {copyFor,INTERVIEW_PROBES,probeDefinition,probesForTopic,type Language} from '../interview-probes.js'
 import {buildQuestionSnapshot,nextProbeId,normalizeAnswer,normalizeChatAnswer,recommendationValue,validateAddProbes,validateAssumption,validateFollowUp,type AnswerOutcome} from '../interview-answer.js'
 import {compileProfileDraftFromInterview} from '../profile-compiler.js'
-import {interviewTopics, learnLoopStateSchema, type CommandResult, type EnhancementReport, type InterviewProbeId, type LearningProject, type LearnLoopState, type ProbeValue, type ProfileInterviewState} from '../types.js'
+import {interviewProbeIds, interviewTopics, learnLoopStateSchema, type CommandResult, type EnhancementReport, type InterviewProbeId, type LearningProject, type LearnLoopState, type ProbeValue, type ProfileInterviewState} from '../types.js'
 import {activeProject,fail,now,resolveSessionWorkspace,uid,workspaceForSession} from './shared.js'
 import {applyWorkspaceCommand} from './bus.js'
 
@@ -12,9 +12,11 @@ type StepStatus=Extract<CommandResult,{kind:'interview-answer-recorded'}>['statu
 const languageOf=(state:LearnLoopState):Language=>state.settings.language
 const noReport=():EnhancementReport=>({applied:[],rejected:[]})
 
+/** A record over every key of an `as const` tuple, so it is exhaustive by construction rather than by assertion. */
+function recordOver<K extends string,V>(keys:readonly K[],value:(key:K,index:number)=>V):Record<K,V>{const out={} as Record<K,V>;keys.forEach((key,index)=>{out[key]=value(key,index)});return out}
 export function createProfileInterview(at=now()):ProfileInterviewState{
- const probes=Object.fromEntries(INTERVIEW_PROBES.map((definition,index)=>[definition.id,{id:definition.id,topic:definition.topic,status:index===0?'asking' as const:'pending' as const,answerIds:[],emptyAttempts:0,clarifications:0,value:null,valueOrigin:null,note:null}])) as ProfileInterviewState['probes']
- const topics=Object.fromEntries(interviewTopics.map((topic,index)=>[topic,{topic,status:index===0?'collecting' as const:'pending' as const,requiredProbeIds:probesForTopic(topic).filter(id=>INTERVIEW_PROBES.find(definition=>definition.id===id)!.presence!=='optional'),completedProbeIds:[]}])) as ProfileInterviewState['topics']
+ const probes:ProfileInterviewState['probes']=recordOver(interviewProbeIds,(id,index)=>({id,topic:probeDefinition(id).topic,status:index===0?'asking' as const:'pending' as const,answerIds:[],emptyAttempts:0,clarifications:0,value:null,valueOrigin:null,note:null}))
+ const topics:ProfileInterviewState['topics']=recordOver(interviewTopics,(topic,index)=>({topic,status:index===0?'collecting' as const:'pending' as const,requiredProbeIds:probesForTopic(topic).filter(id=>probeDefinition(id).presence!=='optional'),completedProbeIds:[]}))
  const first=INTERVIEW_PROBES[0]!
  return{schemaVersion:5,mode:'initial',status:'collecting',currentTopic:first.topic,currentProbeId:first.id,awaitingChatProbeId:null,fallbackAfterSeq:null,pendingQuestion:{token:randomUUID(),questionRevision:1,probeId:first.id,stage:'initial',followUpOf:null,createdAt:at},activeQuestion:null,optionSnapshots:[],topics,probes,answers:[],addedProbeIds:[],supplementaryAnswers:[],revisionRequest:null,createdAt:at,updatedAt:at}
 }

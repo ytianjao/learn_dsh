@@ -22,7 +22,8 @@ export type PlanIntentActivity = z.infer<typeof planIntentActivitySchema>
 const normalized = (value: string) => value.trim().toLowerCase()
 // The violation travels in details: the tool error envelope drops the message, and without it the
 // model retries blind and burns its single correct-and-retry attempt on the same mistake.
-const invalid = (message: string): never => { throw new LearnLoopDomainError('INVALID_PLAN', message, { violation: message }) }
+// A declaration so control flow narrows after `if (...) invalid(...)`; a const arrow does not.
+function invalid(message: string): never { throw new LearnLoopDomainError('INVALID_PLAN', message, { violation: message }) }
 /** Plan rules read only the preferences and weekly time the learner confirmed. */
 export type PlanProfile = Pick<LearnerProfile, 'learningPreferences' | 'weeklyHours'>
 /** The profile-derived plan rules, published to the model before it drafts and enforced below. */
