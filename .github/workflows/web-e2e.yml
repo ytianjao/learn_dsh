@@ -25,14 +25,14 @@ jobs:
         with:
           node-version: 22.19.0
           cache: pnpm
+      - name: Install LearnLoop
+        run: pnpm install --frozen-lockfile
       - name: Print compatibility baseline
         run: |
           echo "LearnLoop commit: $(git rev-parse HEAD)"
           node -e "console.log('DSH version:', require('@deepseek-ai/dsh/package.json').version)"
           echo "Node version: $(node --version)"
           echo "pnpm version: $(pnpm --version)"
-      - name: Install LearnLoop
-        run: pnpm install --frozen-lockfile
       - name: Build LearnLoop
         run: pnpm run build
       - name: Install Playwright Chromium
